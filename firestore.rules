@@ -1,0 +1,59 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Test connection check
+    match /test/{testId} {
+      allow read: if true;
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Creative Gig Quests
+    match /quests/{questId} {
+      allow read: if true;
+      allow create: if isSignedIn() && incoming().clientUid == request.auth.uid;
+      allow update: if isSignedIn() && (existing().clientUid == request.auth.uid);
+      allow delete: if isSignedIn() && existing().clientUid == request.auth.uid;
+    }
+
+    // Applications & Proposals
+    match /applications/{applicationId} {
+      allow read: if isSignedIn() && (resource.data.applicantUid == request.auth.uid || resource.data.clientUid == request.auth.uid);
+      allow create: if isSignedIn() && incoming().applicantUid == request.auth.uid;
+      allow update: if isSignedIn() && (existing().applicantUid == request.auth.uid || existing().clientUid == request.auth.uid);
+      allow delete: if isSignedIn() && existing().applicantUid == request.auth.uid;
+    }
+
+    // Bookmarks / Saved Quests
+    match /bookmarks/{bookmarkId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+  }
+}

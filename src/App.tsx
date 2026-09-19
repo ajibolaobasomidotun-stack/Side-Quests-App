@@ -56,6 +56,19 @@ import { INITIAL_USER_PROFILE, ARTIST_CATEGORIES, PROVIDER_CATEGORIES } from './
 import { ProfileCreator } from './components/ProfileCreator';
 import { ProfileView } from './components/ProfileView';
 import { PostQuestModal } from './components/PostQuestModal';
+import { 
+  auth, 
+  signInWithGoogle, 
+  signOutUser, 
+  syncUserProfile, 
+  fetchUserProfile,
+  createFirestoreQuest,
+  subscribeQuests,
+  submitQuestApplication,
+  toggleFirestoreBookmark,
+  subscribeUserBookmarks
+} from './lib/firebase';
+import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'quests' | 'creatives' | 'learn' | 'pricing' | 'tasks' | 'profile'>('quests');
@@ -63,6 +76,12 @@ export default function App() {
   const [creatives, setCreatives] = useState<Creative[]>(INITIAL_CREATIVES);
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
   
+  // Firebase Auth & Cloud Firestore state
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+  const [userBookmarks, setUserBookmarks] = useState<string[]>([]);
+  const [serverStatus, setServerStatus] = useState<{ status: string; totalEscrow?: string } | null>(null);
+
   // User Profile state
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
     const saved = localStorage.getItem('sidequests_user_profile');
@@ -124,12 +143,173 @@ export default function App() {
     }, 4000);
   };
 
-  const handleSaveUserProfile = (savedProfile: UserProfile) => {
+  // Check Express Backend Server Health & Platform Statistics
+  useEffect(() => {
+    fetch('/api/health')
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'ok') {
+          fetch('/api/stats')
+            .then(res => res.json())
+            .then(stats => setServerStatus({ status: 'Operational', totalEscrow: stats.totalSecuredEscrow }))
+            .catch(() => setServerStatus({ status: 'Operational' }));
+        }
+      })
+      .catch(() => {
+        // Dev / fallback
+      });
+  }, []);
+
+  // Firebase Auth State Listener & Firestore Profile Hydration
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user);
+      setIsAuthLoading(false);
+      if (user) {
+        try {
+          const remoteProfile = await fetchUserProfile(user.uid);
+          if (remoteProfile) {
+            setUserProfile(prev => ({
+              ...prev,
+              ...remoteProfile,
+              id: user.uid,
+              displayName: remoteProfile.name || remoteProfile.displayName || user.displayName || prev.displayName,
+              avatarUrl: remoteProfile.photoURL || user.photoURL || prev.avatarUrl,
+            }));
+          } else {
+            // First-time sync with Google account info
+            const initialSyncProfile: UserProfile = {
+              ...userProfile,
+              id: user.uid,
+              displayName: user.displayName || userProfile.displayName,
+              avatarUrl: user.photoURL || userProfile.avatarUrl,
+            };
+            setUserProfile(initialSyncProfile);
+            await syncUserProfile(user.uid, {
+              name: initialSyncProfile.displayName,
+              email: user.email || '',
+              photoURL: initialSyncProfile.avatarUrl,
+              accountType: initialSyncProfile.accountType,
+              roleHeadline: initialSyncProfile.roleHeadline,
+              bio: initialSyncProfile.bio,
+              hourlyRate: initialSyncProfile.hourlyRate || 120,
+              verified: true,
+              skills: initialSyncProfile.selectedCategories
+            });
+          }
+        } catch (e) {
+          console.warn("Firestore profile sync error:", e);
+        }
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // Real-time Cloud Firestore Quests Subscription
+  useEffect(() => {
+    const unsubQuests = subscribeQuests((remoteQuests) => {
+      if (remoteQuests && remoteQuests.length > 0) {
+        setQuests(prev => {
+          const remoteIds = new Set(remoteQuests.map(q => q.id));
+          const existingFiltered = prev.filter(q => !remoteIds.has(q.id));
+          const mappedRemote: Quest[] = remoteQuests.map(rq => ({
+            id: rq.id,
+            title: rq.title,
+            clientName: rq.clientName || 'Verified Producer',
+            clientAvatar: rq.clientAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+            category: rq.category || 'Production',
+            budget: typeof rq.budget === 'number' ? rq.budget : parseInt(String(rq.budget).replace(/[^0-9]/g, '')) || 2500,
+            deadline: rq.deadline || 'Flexible',
+            description: rq.description || 'Escrow protected gig opportunity.',
+            requirements: rq.tags || ['Verified Escrow', 'Direct Payout'],
+            milestones: [
+              { id: 'm1', title: 'Phase 1 - Delivery & Review', amount: Math.round((typeof rq.budget === 'number' ? rq.budget : 2500) * 0.5), status: 'escrowed' },
+              { id: 'm2', title: 'Phase 2 - Final Sign-off', amount: Math.round((typeof rq.budget === 'number' ? rq.budget : 2500) * 0.5), status: 'escrowed' }
+            ],
+            status: rq.status || 'open'
+          }));
+          return [...mappedRemote, ...existingFiltered];
+        });
+      }
+    });
+    return () => unsubQuests();
+  }, []);
+
+  // Real-time Cloud Firestore Bookmarks Subscription
+  useEffect(() => {
+    if (!currentUser) {
+      setUserBookmarks([]);
+      return;
+    }
+    const unsub = subscribeUserBookmarks(currentUser.uid, (ids) => {
+      setUserBookmarks(ids);
+    });
+    return () => unsub();
+  }, [currentUser]);
+
+  const handleGoogleSignIn = async () => {
+    try {
+      const user = await signInWithGoogle();
+      if (user) {
+        showToast(`Connected as ${user.displayName || user.email}! Cloud sync enabled.`, 'success');
+      }
+    } catch (err: any) {
+      if (err?.code !== 'auth/popup-closed-by-user') {
+        showToast('Authentication failed. Please try again.', 'error');
+      }
+    }
+  };
+
+  const handleGoogleSignOut = async () => {
+    try {
+      await signOutUser();
+      showToast('Signed out of SideQuests.', 'info');
+    } catch (err) {
+      showToast('Could not sign out.', 'error');
+    }
+  };
+
+  const handleToggleBookmark = async (questId: string) => {
+    const isBookmarked = userBookmarks.includes(questId);
+    if (!currentUser) {
+      setUserBookmarks(prev => isBookmarked ? prev.filter(id => id !== questId) : [...prev, questId]);
+      showToast(isBookmarked ? 'Quest removed from saved list.' : 'Quest saved locally. Sign in to sync across devices!', 'info');
+      return;
+    }
+    try {
+      await toggleFirestoreBookmark(currentUser.uid, questId, isBookmarked);
+      showToast(isBookmarked ? 'Removed from saved quests.' : 'Quest saved to Firestore bookmarks!', 'success');
+    } catch (err) {
+      console.warn("Bookmark toggle note:", err);
+    }
+  };
+
+  const handleSaveUserProfile = async (savedProfile: UserProfile) => {
     setUserProfile(savedProfile);
     try {
       localStorage.setItem('sidequests_user_profile', JSON.stringify(savedProfile));
     } catch (e) {
       console.error(e);
+    }
+
+    // Persist to Cloud Firestore if user is authenticated
+    if (currentUser) {
+      try {
+        await syncUserProfile(currentUser.uid, {
+          name: savedProfile.displayName,
+          accountType: savedProfile.accountType,
+          roleHeadline: savedProfile.roleHeadline,
+          bio: savedProfile.bio,
+          hourlyRate: savedProfile.hourlyRate,
+          photoURL: savedProfile.avatarUrl,
+          skills: savedProfile.selectedCategories,
+          credits: savedProfile.credits,
+          gear: savedProfile.gear,
+          verified: true
+        });
+      } catch (err) {
+        console.warn('Could not sync profile to Firestore:', err);
+      }
     }
     
     // If saving as artist, dynamically update/add to creatives collective
@@ -170,7 +350,7 @@ export default function App() {
 
     setIsEditingProfile(false);
     showToast(
-      `Account configured as ${savedProfile.accountType === 'artist' ? 'Artist Talent' : 'Gig Provider'} with ${savedProfile.selectedCategories.length} selected categories!`,
+      `Profile saved${currentUser ? ' and synced to Cloud Firestore' : ''} with ${savedProfile.selectedCategories.length} categories!`,
       'success'
     );
   };
@@ -202,12 +382,32 @@ export default function App() {
     showToast(`Account view switched to ${newType === 'artist' ? 'Artist Talent' : 'Gig Provider'}!`, 'info');
   };
 
-  const handleAddNewQuest = (newQuest: Quest) => {
+  const handleAddNewQuest = async (newQuest: Quest) => {
     setQuests(prev => [newQuest, ...prev]);
     showToast(`Quest "${newQuest.title}" posted to the SideQuests network! Escrow ready.`, 'success');
+
+    // Persist quest to Firestore
+    if (currentUser) {
+      try {
+        await createFirestoreQuest({
+          title: newQuest.title,
+          description: newQuest.description,
+          budget: `$${newQuest.budget.toLocaleString()}`,
+          clientName: userProfile.displayName,
+          clientUid: currentUser.uid,
+          deadline: newQuest.deadline,
+          category: newQuest.category,
+          status: 'open',
+          escrowProtected: true,
+          tags: newQuest.requirements
+        });
+      } catch (err) {
+        console.warn("Could not sync quest to Firestore:", err);
+      }
+    }
   };
 
-  const handleApplyQuest = (quest: Quest) => {
+  const handleApplyQuest = async (quest: Quest) => {
     // Check if already applied
     if (quest.applied) {
       showToast('You have already applied to this gig!', 'info');
@@ -216,6 +416,23 @@ export default function App() {
 
     // Set quest as applied
     setQuests(prev => prev.map(q => q.id === quest.id ? { ...q, applied: true } : q));
+
+    // Persist application to Firestore
+    if (currentUser) {
+      try {
+        await submitQuestApplication({
+          questId: quest.id,
+          questTitle: quest.title,
+          applicantUid: currentUser.uid,
+          applicantName: userProfile.displayName,
+          applicantAvatar: userProfile.avatarUrl,
+          proposalText: `Verified creative application for "${quest.title}". All deliverables will be protected via smart escrow milestones.`,
+          bidAmount: `$${quest.budget.toLocaleString()}`
+        });
+      } catch (err) {
+        console.warn("Firestore application submission note:", err);
+      }
+    }
 
     // Create a new task (active contract) for the user as the Artist
     const newTask: Task = {
@@ -539,35 +756,64 @@ export default function App() {
             <button className={`hover:text-brand-volt transition-colors ${activeTab === 'profile' ? 'text-brand-volt font-bold' : ''}`} onClick={() => { setActiveTab('profile'); setIsEditingProfile(false); }}>Profile</button>
           </div>
 
-          {/* User Account / Profile Badge */}
-          <button 
-            onClick={() => {
-              setActiveTab('profile');
-              setIsEditingProfile(false);
-            }}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
-              activeTab === 'profile' 
-                ? 'bg-brand-volt/15 border-brand-volt text-brand-volt shadow-[0_0_15px_rgba(195,244,0,0.2)]' 
-                : 'bg-white/5 border-white/10 hover:border-white/20 text-white'
-            }`}
-          >
-            <img 
-              src={userProfile.avatarUrl} 
-              alt={userProfile.displayName} 
-              className="w-5 h-5 rounded-full object-cover border border-white/20"
-              referrerPolicy="no-referrer"
-            />
-            <span className="hidden sm:inline font-sans text-xs font-semibold max-w-[100px] truncate text-white">
-              {userProfile.displayName.split(' ')[0]}
-            </span>
-            <span className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded font-bold ${
-              userProfile.accountType === 'artist' 
-                ? 'bg-brand-volt text-brand-bg' 
-                : 'bg-indigo-500 text-white'
-            }`}>
-              {userProfile.accountType === 'artist' ? 'Artist' : 'Provider'}
-            </span>
-          </button>
+          {/* Backend / Escrow Server Status Pill */}
+          {serverStatus && (
+            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-volt/5 border border-brand-volt/20 text-brand-volt font-mono text-[9px] uppercase tracking-wider">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-volt animate-ping" />
+              <span>Full-Stack Live</span>
+              {serverStatus.totalEscrow && <span className="text-white/60">({serverStatus.totalEscrow})</span>}
+            </div>
+          )}
+
+          {/* Google Auth / Profile Controls */}
+          {currentUser ? (
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => {
+                  setActiveTab('profile');
+                  setIsEditingProfile(false);
+                }}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
+                  activeTab === 'profile' 
+                    ? 'bg-brand-volt/15 border-brand-volt text-brand-volt shadow-[0_0_15px_rgba(195,244,0,0.2)]' 
+                    : 'bg-white/5 border-white/10 hover:border-white/20 text-white'
+                }`}
+              >
+                <img 
+                  src={currentUser.photoURL || userProfile.avatarUrl} 
+                  alt={currentUser.displayName || userProfile.displayName} 
+                  className="w-5 h-5 rounded-full object-cover border border-brand-volt/40"
+                  referrerPolicy="no-referrer"
+                />
+                <span className="hidden sm:inline font-sans text-xs font-semibold max-w-[110px] truncate text-white">
+                  {(currentUser.displayName || userProfile.displayName).split(' ')[0]}
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-brand-volt" title="Synced with Firebase" />
+              </button>
+
+              <button
+                onClick={handleGoogleSignOut}
+                title="Sign Out"
+                className="text-brand-text-muted hover:text-red-400 text-xs px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-colors font-mono uppercase text-[10px]"
+              >
+                Logout
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleGoogleSignIn}
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-mono text-xs tracking-wider transition-all hover:border-brand-volt/60 hover:text-brand-volt cursor-pointer shadow-sm active:scale-95"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
+                <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z" />
+                <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
+                <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2c0 2.8.7 5.5 1.9 7.8l3.7-2.9z" />
+                <path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z" />
+              </svg>
+              <span className="hidden sm:inline">Sign In with Google</span>
+              <span className="sm:hidden">Sign In</span>
+            </button>
+          )}
 
           <button 
             aria-label="Notifications" 
@@ -597,10 +843,10 @@ export default function App() {
                     Beta Access Available
                   </span>
                   <h2 className="font-display text-4xl sm:text-5xl md:text-6xl text-white mb-6 leading-[1.1] tracking-tight">
-                    The Operating System for the Modern <span className="text-brand-volt text-glow italic font-normal font-display block sm:inline">Music Gig Economy</span>
+                    The Operating System for the Modern <span className="text-brand-volt text-glow italic font-normal font-display block sm:inline">Creative Gig Economy</span>
                   </h2>
                   <p className="text-lg md:text-xl text-brand-text-muted mb-10 leading-relaxed font-sans max-w-xl">
-                    Connecting world-class musicians, engineers, and producers with high-stakes, escrow-protected opportunities.
+                    Connecting world-class creatives with escrow-protected gig opportunities.
                   </p>
                   <div className="flex flex-col sm:flex-row flex-wrap gap-3">
                     <button 
@@ -618,13 +864,28 @@ export default function App() {
                     >
                       Hire Talent
                     </button>
-                    <button 
-                      onClick={() => handleStartCreateProfile('artist')}
-                      className="border border-brand-volt/40 bg-brand-volt/10 text-brand-volt font-sans font-semibold text-sm px-6 py-3.5 rounded-xl hover:bg-brand-volt/20 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <UserPlus className="w-4 h-4 text-brand-volt" />
-                      Create Profile
-                    </button>
+                    {!currentUser ? (
+                      <button 
+                        onClick={handleGoogleSignIn}
+                        className="border border-white/30 bg-white/10 text-white font-sans font-semibold text-sm px-6 py-3.5 rounded-xl hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-sm"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24">
+                          <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z" />
+                          <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
+                          <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2c0 2.8.7 5.5 1.9 7.8l3.7-2.9z" />
+                          <path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z" />
+                        </svg>
+                        Connect with Google
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => handleStartCreateProfile('artist')}
+                        className="border border-brand-volt/40 bg-brand-volt/10 text-brand-volt font-sans font-semibold text-sm px-6 py-3.5 rounded-xl hover:bg-brand-volt/20 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <UserPlus className="w-4 h-4 text-brand-volt" />
+                        Edit Profile
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -892,9 +1153,24 @@ export default function App() {
                                 <span className="block font-mono text-[10px] text-brand-volt uppercase tracking-wider mt-0.5">{quest.category}</span>
                               </div>
                             </div>
-                            <span className="font-mono text-base font-bold text-brand-volt bg-brand-volt/5 border border-brand-volt/10 px-3 py-1 rounded-lg">
-                              ${quest.budget.toLocaleString()}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => handleToggleBookmark(quest.id)}
+                                title={userBookmarks.includes(quest.id) ? "Remove from saved" : "Save Quest to Firestore"}
+                                className={`p-2 rounded-lg border transition-all cursor-pointer ${
+                                  userBookmarks.includes(quest.id)
+                                    ? 'bg-brand-volt/20 border-brand-volt text-brand-volt shadow-[0_0_10px_rgba(195,244,0,0.3)]'
+                                    : 'bg-white/5 border-white/10 text-brand-text-muted hover:text-white hover:border-white/20'
+                                }`}
+                              >
+                                <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                                  <path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z" />
+                                </svg>
+                              </button>
+                              <span className="font-mono text-base font-bold text-brand-volt bg-brand-volt/5 border border-brand-volt/10 px-3 py-1 rounded-lg">
+                                ${quest.budget.toLocaleString()}
+                              </span>
+                            </div>
                           </div>
 
                           <h4 className="font-display text-lg text-white font-semibold mb-2 leading-snug">{quest.title}</h4>
@@ -1739,6 +2015,9 @@ export default function App() {
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                   onOpenCreateQuestModal={() => setIsPostQuestModalOpen(true)}
+                  currentUser={currentUser}
+                  onGoogleSignIn={handleGoogleSignIn}
+                  onGoogleSignOut={handleGoogleSignOut}
                 />
               )}
             </motion.div>
@@ -1754,7 +2033,7 @@ export default function App() {
           <div className="md:col-span-1">
             <h2 className="font-display text-2xl text-white tracking-tight mb-4 font-semibold">SIDEQUESTS</h2>
             <p className="text-brand-text-muted text-xs leading-relaxed max-w-xs">
-              The high-fidelity professional network and operating system for the global music infrastructure. Handcrafted by audio veterans.
+              The professional network and operating system for the global creative economy. Handcrafted by creatives
             </p>
           </div>
           <div>
@@ -1793,7 +2072,7 @@ export default function App() {
         </div>
         <div className="pt-6 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center gap-3 text-brand-text-muted font-mono text-[10px] uppercase tracking-wider">
           <span>© 2026 SIDEQUESTS GLOBAL INC.</span>
-          <span>HANDCRAFTED FOR THE AUDIO ELITE</span>
+          <span>HANDCRAFTED FOR CREATIVES</span>
         </div>
       </footer>
 

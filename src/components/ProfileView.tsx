@@ -35,6 +35,9 @@ interface ProfileViewProps {
   onSelectCreative: (creative: Creative) => void;
   onNavigateTab: (tab: 'quests' | 'creatives' | 'learn' | 'pricing' | 'tasks') => void;
   onOpenCreateQuestModal?: () => void;
+  currentUser?: any;
+  onGoogleSignIn?: () => void;
+  onGoogleSignOut?: () => void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
@@ -46,7 +49,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onSelectQuest,
   onSelectCreative,
   onNavigateTab,
-  onOpenCreateQuestModal
+  onOpenCreateQuestModal,
+  currentUser,
+  onGoogleSignIn,
+  onGoogleSignOut
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'matches' | 'categories'>('overview');
 
@@ -138,7 +144,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 w-full md:w-auto">
             <button
               onClick={onEditProfile}
-              className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-5 py-2.5 rounded-xl hover:scale-105 active:scale-95 transition-all shadow-md shadow-brand-volt/10 flex items-center justify-center gap-2"
+              className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-5 py-2.5 rounded-xl hover:scale-105 active:scale-95 transition-all shadow-md shadow-brand-volt/10 flex items-center justify-center gap-2 cursor-pointer"
             >
               <Edit3 className="w-4 h-4" />
               Edit Profile & Categories
@@ -146,7 +152,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             
             <button
               onClick={() => onSwitchAccountType(profile.accountType === 'artist' ? 'provider' : 'artist')}
-              className="bg-white/5 hover:bg-white/10 border border-white/10 text-white font-sans font-medium text-xs px-4 py-2 rounded-xl transition-all flex items-center justify-center gap-2"
+              className="bg-white/5 hover:bg-white/10 border border-white/10 text-white font-sans font-medium text-xs px-4 py-2 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               {profile.accountType === 'artist' ? (
                 <>
@@ -160,6 +166,36 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 </>
               )}
             </button>
+
+            {currentUser ? (
+              <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-brand-volt/10 border border-brand-volt/30 text-brand-volt text-[11px] font-mono">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-brand-volt" />
+                  Cloud Firestore Synced
+                </span>
+                {onGoogleSignOut && (
+                  <button 
+                    onClick={onGoogleSignOut}
+                    className="text-white/60 hover:text-red-400 uppercase text-[9px] underline transition-colors cursor-pointer"
+                  >
+                    Disconnect
+                  </button>
+                )}
+              </div>
+            ) : onGoogleSignIn ? (
+              <button
+                onClick={onGoogleSignIn}
+                className="bg-white/10 hover:bg-white/15 border border-white/20 text-white font-sans font-medium text-xs px-4 py-2 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
+                  <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z" />
+                  <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
+                  <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2c0 2.8.7 5.5 1.9 7.8l3.7-2.9z" />
+                  <path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z" />
+                </svg>
+                Sync with Google Account
+              </button>
+            ) : null}
           </div>
         </div>
 

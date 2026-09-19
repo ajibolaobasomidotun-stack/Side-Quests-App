@@ -1,0 +1,92 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Creative professional or client user profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "User unique identifier matching auth UID" },
+        "name": { "type": "string", "description": "Display name of the user" },
+        "email": { "type": "string", "description": "Contact email address" },
+        "photoURL": { "type": "string", "description": "Profile avatar image URL" },
+        "accountType": { "type": "string", "enum": ["artist", "client"], "description": "Type of account: creative artist or hiring client" },
+        "roleHeadline": { "type": "string", "description": "Professional headline or primary role" },
+        "bio": { "type": "string", "description": "Biographical summary of experience and credentials" },
+        "skills": { "type": "array", "description": "List of core creative skills or specialties" },
+        "hourlyRate": { "type": "string", "description": "Stated hourly or day rate range" },
+        "verified": { "type": "boolean", "description": "Whether user identity and credentials have been verified" },
+        "createdAt": { "type": "string", "description": "Timestamp when the profile was created" },
+        "updatedAt": { "type": "string", "description": "Timestamp of most recent profile update" }
+      },
+      "required": ["id", "name", "email", "accountType"]
+    },
+    "Quest": {
+      "title": "Quest",
+      "description": "High-stakes creative gig opportunity with escrow protection",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier of the quest" },
+        "title": { "type": "string", "description": "Title of the creative gig or position" },
+        "description": { "type": "string", "description": "Detailed project brief and deliverable specifications" },
+        "budget": { "type": "string", "description": "Budget compensation amount or rate" },
+        "clientName": { "type": "string", "description": "Name of the hiring client or production company" },
+        "clientUid": { "type": "string", "description": "Auth UID of the client who posted the quest" },
+        "deadline": { "type": "string", "description": "Target completion date or timeline" },
+        "category": { "type": "string", "description": "Creative category (e.g., Audio, Visual, Direction, Production)" },
+        "status": { "type": "string", "enum": ["open", "in_progress", "completed", "closed"], "description": "Current lifecycle status of the quest" },
+        "escrowProtected": { "type": "boolean", "description": "Whether payment is locked in verified smart escrow" },
+        "tags": { "type": "array", "description": "Relevant skill tags" },
+        "createdAt": { "type": "string", "description": "Timestamp when quest was posted" }
+      },
+      "required": ["title", "budget", "clientUid", "status"]
+    },
+    "Application": {
+      "title": "Application",
+      "description": "Application/proposal submitted by a creative to a quest",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique proposal identifier" },
+        "questId": { "type": "string", "description": "ID of the target quest" },
+        "questTitle": { "type": "string", "description": "Title of the target quest" },
+        "applicantUid": { "type": "string", "description": "Auth UID of the applying creative" },
+        "applicantName": { "type": "string", "description": "Full name of the applying creative" },
+        "applicantAvatar": { "type": "string", "description": "Avatar photo URL of applicant" },
+        "proposalText": { "type": "string", "description": "Proposal message pitch and delivery approach" },
+        "bidAmount": { "type": "string", "description": "Proposed bid compensation" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined"], "description": "Current review status" },
+        "createdAt": { "type": "string", "description": "Timestamp when proposal was sent" }
+      },
+      "required": ["questId", "applicantUid", "proposalText", "status"]
+    },
+    "Bookmark": {
+      "title": "Bookmark",
+      "description": "User saved quest reference",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Bookmark record identifier" },
+        "userId": { "type": "string", "description": "Auth UID of the user saving the quest" },
+        "questId": { "type": "string", "description": "ID of the bookmarked quest" },
+        "createdAt": { "type": "string", "description": "Timestamp when saved" }
+      },
+      "required": ["userId", "questId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile document indexed by Auth UID"
+    },
+    "/quests/{questId}": {
+      "schema": "Quest",
+      "description": "Open and completed gig quests"
+    },
+    "/applications/{applicationId}": {
+      "schema": "Application",
+      "description": "Proposals submitted by creatives for quests"
+    },
+    "/bookmarks/{bookmarkId}": {
+      "schema": "Bookmark",
+      "description": "Saved quests bookmarked by users"
+    }
+  }
+}

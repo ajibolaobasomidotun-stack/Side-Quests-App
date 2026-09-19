@@ -1,6 +1,6 @@
 {
   "name": "SideQuests",
-  "description": "The high-fidelity professional network and operating system for the global music infrastructure. Connecting world-class musicians, engineers, and producers with high-stakes gig opportunities.",
+  "description": "The professional network and operating system for the global creative economy. Connecting world-class creatives with escrow-protected gig opportunities.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
