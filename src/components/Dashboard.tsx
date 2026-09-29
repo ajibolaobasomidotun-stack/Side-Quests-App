@@ -153,7 +153,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     );
   }
 
-  // Artist view
+  // Creative view
   const apps = props.myApplications;
   return (
     <section className="space-y-4">

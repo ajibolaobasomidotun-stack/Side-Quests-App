@@ -29,7 +29,7 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({ quest, onClose, onSubmit
     e.preventDefault();
     const bidAmount = Math.round(parseFloat(bid));
     if (proposal.trim().length < 20) {
-      setError('Tell the studio a bit more (at least 20 characters): relevant credits, gear, availability.');
+      setError('Tell the gig provider a bit more (at least 20 characters): relevant work, experience, availability.');
       return;
     }
     if (!bidAmount || bidAmount <= 0) {
@@ -76,7 +76,7 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({ quest, onClose, onSubmit
             onChange={(e) => setProposal(e.target.value)}
             rows={6}
             maxLength={5000}
-            placeholder="Why you're right for this: relevant credits, gear, and when you can start."
+            placeholder="Why you're right for this: relevant past work, experience, and when you can start."
             className="w-full bg-brand-bg border border-white/10 focus:border-brand-volt focus:outline-none rounded-xl p-4 text-sm text-white placeholder:text-brand-text-muted mb-4"
           />
 

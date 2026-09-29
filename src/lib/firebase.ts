@@ -25,6 +25,7 @@ import {
 } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
 import type { AccountType, Application, ApplicationStatus, Quest, UserProfile } from "../types";
+import { normalizeCategory } from "../categories";
 
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
@@ -186,9 +187,9 @@ function docToQuest(id: string, d: Record<string, any>): Quest {
     id,
     title: d.title || "Untitled quest",
     clientUid: d.clientUid,
-    clientName: d.clientName || "SideQuests Studio",
+    clientName: d.clientName || "Gig Provider",
     clientAvatar: d.clientAvatar || "",
-    category: d.category || "Production",
+    category: normalizeCategory(d.category),
     budget,
     deadline: d.deadline || "Flexible",
     description: d.description || "",

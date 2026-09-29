@@ -112,7 +112,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, initialMode = 'sig
 
           <form onSubmit={handleSubmit} className="space-y-3">
             {mode === 'signup' && (
-              <input className={inputClass} placeholder="Full name or studio name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+              <input className={inputClass} placeholder="Full name or business name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
             )}
             <input className={inputClass} type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
             {mode !== 'reset' && (

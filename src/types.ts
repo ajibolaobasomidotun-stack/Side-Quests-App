@@ -3,10 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { GigCategory } from './categories';
+export type { GigCategory } from './categories';
+
 export interface Creative {
   id: string;
   name: string;
-  role: 'producer' | 'engineer' | 'musician' | 'md';
+  /** The creative vertical this person mainly works in. */
+  role: GigCategory;
   roleLabel: string;
   avatarUrl: string;
   bio: string;
@@ -26,7 +30,7 @@ export interface Quest {
   clientUid?: string;
   clientName: string;
   clientAvatar: string;
-  category: 'Live Performance' | 'Studio Sessions' | 'Production';
+  category: GigCategory;
   budget: number;
   deadline: string;
   description: string;
@@ -146,7 +150,7 @@ export interface UserProfile {
   
   // Gig Provider specific
   organizationName?: string;
-  orgType?: 'Record Label' | 'Touring Agency' | 'Studio Facility' | 'Film / Game Audio' | 'Independent Producer' | 'Live Event Organizer';
+  orgType?: string;
   budgetTier?: 'tier_under_5k' | 'tier_5k_25k' | 'tier_25k_100k' | 'tier_100k_plus';
   verifiedEscrowFunded?: boolean;
   activeQuestsCount?: number;

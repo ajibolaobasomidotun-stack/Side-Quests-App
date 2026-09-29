@@ -52,6 +52,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { Creative, Quest, Task, Article, UserProfile, AccountType, Application } from './types';
 import { LEARN_ARTICLES } from './data';
+import { GIG_CATEGORIES, GIG_CATEGORY_KEYS } from './categories';
 import { INITIAL_USER_PROFILE, ARTIST_CATEGORIES, PROVIDER_CATEGORIES } from './profileData';
 import { ProfileCreator } from './components/ProfileCreator';
 import { ProfileView } from './components/ProfileView';
@@ -178,7 +179,7 @@ export default function App() {
           setUserProfile(remoteProfile);
           setHasProfile(true);
         } else {
-          // New account: send them through profile setup, where they choose Artist or Studio.
+          // New account: send them through profile setup, where they choose Creative or Gig Provider.
           setHasProfile(false);
           setUserProfile(prev => ({
             ...INITIAL_USER_PROFILE,
@@ -233,14 +234,12 @@ export default function App() {
     .filter(p => p.displayName && p.id !== undefined)
     .map((p): Creative => {
       const cats = p.selectedCategories || [];
-      const has = (...keys: string[]) => cats.some(c => keys.some(k => c.includes(k)));
+      const firstGroup = cats.map(id => ARTIST_CATEGORIES.find(x => x.id === id)?.group).find(Boolean);
+      const role = (GIG_CATEGORY_KEYS as string[]).includes(firstGroup || '') ? (firstGroup as Creative['role']) : 'Other';
       return {
         id: p.id,
         name: p.displayName,
-        role: has('music_director', '_md') ? 'md'
-          : has('atmos', 'mix', 'master', 'eng', 'tuning', 'foh') ? 'engineer'
-          : has('prod', 'beat', 'hiphop', 'pop', 'electronic', 'compos', 'score') ? 'producer'
-          : 'musician',
+        role,
         roleLabel: p.roleHeadline || 'Creative',
         avatarUrl: p.avatarUrl || 'https://ui-avatars.com/api/?background=1a1a1a&color=c3f400&name=' + encodeURIComponent(p.displayName),
         bio: p.bio || '',
@@ -332,7 +331,7 @@ export default function App() {
     try {
       await updateAccountType(currentUser.uid, newType);
       setUserProfile(prev => ({ ...prev, accountType: newType }));
-      showToast(`Switched to ${newType === 'artist' ? 'Artist' : 'Studio / Gig Provider'} account.`, 'info');
+      showToast(`Switched to ${newType === 'artist' ? 'Creative' : 'Gig Provider'} account.`, 'info');
     } catch (err) {
       showToast('Could not switch account type.', 'error');
     }
@@ -342,7 +341,7 @@ export default function App() {
     if (!currentUser) { openAuth('signup'); return; }
     if (!hasProfile) { handleStartCreateProfile('provider'); return; }
     if (userProfile.accountType !== 'provider') {
-      showToast('Switch to a Studio / Gig Provider account (Profile tab) to post quests.', 'info');
+      showToast('Switch to a Gig Provider account (Profile tab) to post quests.', 'info');
       return;
     }
     setIsPostQuestModalOpen(true);
@@ -374,7 +373,7 @@ export default function App() {
       return;
     }
     if (userProfile.accountType !== 'artist') {
-      showToast('Switch to an Artist account (Profile tab) to apply to quests.', 'info');
+      showToast('Switch to a Creative account (Profile tab) to apply to quests.', 'info');
       return;
     }
     if (appliedQuestIds.has(quest.id)) {
@@ -865,7 +864,7 @@ export default function App() {
                     <div>
                       <h4 className="font-display text-xl md:text-2xl text-white mb-2 font-semibold">Reliable payments</h4>
                       <p className="text-brand-text-muted text-sm leading-relaxed">
-                        Never chase an invoice again. With Protected Payments, the studio pays before you even boot your DAW or step on stage.
+                        Never chase an invoice again. With Protected Payments, the gig provider pays before you start the work.
                       </p>
                     </div>
                   </div>
@@ -878,7 +877,7 @@ export default function App() {
                     <div>
                       <h4 className="font-display text-xl md:text-2xl text-brand-bg mb-2 font-bold leading-tight">Consistent, well-paying gigs</h4>
                       <p className="text-brand-bg/85 text-sm font-medium leading-relaxed">
-                        Access high-value contracts from major labels, video game studios, and independent powerhouses tailored exactly to your technical gear & specs.
+                        Find paid gigs from brands, agencies, event organizers and independent clients that match your skills.
                       </p>
                     </div>
                   </div>
@@ -888,7 +887,7 @@ export default function App() {
                     <div className="flex-1">
                       <h4 className="font-display text-2xl text-white mb-3 font-semibold">Verified portfolios</h4>
                       <p className="text-brand-text-muted text-sm leading-relaxed mb-6">
-                        Your professional reputation is your greatest asset. We aggregate engineering credits, album certifications, and verified client testimonials into a singular high-editorial profile.
+                        Your reputation is your greatest asset. Showcase your best work, credits and skills in one profile gig providers can trust.
                       </p>
                       <button 
                         onClick={() => setActiveTab('creatives')}
@@ -902,7 +901,7 @@ export default function App() {
                       <img 
                         className="w-full h-full object-cover grayscale brightness-90 group-hover:grayscale-0 transition-all duration-700" 
                         src="https://lh3.googleusercontent.com/aida-public/AB6AXuADdQ0rH3ghpBis9Juqesk8fd5Ij1NY52kSoHoDzL1JfZ-4laaASkQkkk-EXr077OP1sxn_ck29BZ4rf-jqvTuWZSt4k9AAGBcbS_cQ3c8xDl-ga6UlAI5dL8MSCCf3hVJMCzZtZmU2xQOkfNHegYgdJsygzPCgk9Abu3v7_Z9JENx7pGv9w_SSJz2GakCerDAXLKktSJnssHyWMuGi_ZRGQLFK-E93Qo77eWbeZh9L7Q1ctvZHmvRfP-1mkPcm2D73YA" 
-                        alt="Musician Professional Portfolio Interface" 
+                        alt="Creative portfolio" 
                         referrerPolicy="no-referrer"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-brand-bg via-transparent to-transparent opacity-60"></div>
@@ -911,12 +910,12 @@ export default function App() {
                 </div>
               </section>
 
-              {/* AGENCY VALUE PROP SECTION: STUDIO OWNERS */}
+              {/* VALUE PROP SECTION: GIG PROVIDERS */}
               <section className="py-16 border-b border-white/5 bg-brand-bg">
                 <div className="max-w-xl mx-auto text-center mb-16">
-                  <h3 className="font-display text-3xl md:text-4xl text-white mb-3 font-semibold">For Studio Owners & Agencies</h3>
+                  <h3 className="font-display text-3xl md:text-4xl text-white mb-3 font-semibold">For Gig Providers</h3>
                   <p className="text-brand-text-muted text-sm leading-relaxed">
-                    Streamline your production pipeline with vetted, high-caliber talent on demand.
+                    Brands, agencies, event organizers and individuals: find the right creative for any project.
                   </p>
                 </div>
 
@@ -925,9 +924,9 @@ export default function App() {
                     <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mb-6 border border-white/10">
                       <Schedule className="w-6 h-6 text-brand-volt" />
                     </div>
-                    <h4 className="font-display text-lg text-white font-semibold mb-3">Book vetted talent in &lt;48 hours</h4>
+                    <h4 className="font-display text-lg text-white font-semibold mb-3">Find talent fast</h4>
                     <p className="text-brand-text-muted text-xs leading-relaxed max-w-xs">
-                      Our proprietary matching algorithm identifies the perfect engineer or performer for your specific sonic requirements instantly.
+                      Post a quest and get applications from creatives with the skills you need, or browse the directory.
                     </p>
                   </div>
 
@@ -937,7 +936,7 @@ export default function App() {
                     </div>
                     <h4 className="font-display text-lg text-white font-semibold mb-3">Simplified logistics</h4>
                     <p className="text-brand-text-muted text-xs leading-relaxed max-w-xs">
-                      Contracting, NDAs, and secure multi-gigabyte file transfers are handled natively within the SideQuests OS. One dashboard for your entire production crew.
+                      Review applicants, hire, and track every quest from one dashboard.
                     </p>
                   </div>
 
@@ -947,100 +946,40 @@ export default function App() {
                     </div>
                     <h4 className="font-display text-lg text-white font-semibold mb-3">Protected payments</h4>
                     <p className="text-brand-text-muted text-xs leading-relaxed max-w-xs">
-                      Funds are only released upon your explicit milestone approval. Absolute security for high-budget productions and sensitive intellectual property.
+                      Funds are only released when you approve each milestone, so you stay in control of your budget.
                     </p>
                   </div>
                 </div>
               </section>
 
-              {/* HIGH-STAKES DISCIPLINES */}
+              {/* CREATIVE DISCIPLINES */}
               <section className="py-16 border-b border-white/5">
-                <div className="mb-10 flex justify-between items-end">
-                  <div>
-                    <h3 className="font-display text-3xl md:text-4xl text-white font-semibold">High-Stakes Disciplines</h3>
-                    <p className="text-brand-text-muted font-mono text-xs uppercase tracking-widest mt-1">Specialized Verticals</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => showToast('Sliding list updated', 'info')}
-                      aria-label="Previous" 
-                      className="p-2 border border-white/10 rounded-lg active:scale-90 transition-all text-brand-text-muted hover:text-white"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => showToast('Sliding list updated', 'info')}
-                      aria-label="Next" 
-                      className="p-2 border border-white/10 rounded-lg active:scale-90 transition-all bg-white/5 text-white"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
+                <div className="mb-10">
+                  <h3 className="font-display text-3xl md:text-4xl text-white font-semibold">Every Kind of Creative Work</h3>
+                  <p className="text-brand-text-muted font-mono text-xs uppercase tracking-widest mt-1">Pick a discipline to see open quests</p>
                 </div>
 
-                <div className="flex overflow-x-auto hide-scrollbar gap-6 pb-6 scroll-smooth snap-x">
-                  {/* Category 1 */}
-                  <div className="flex-shrink-0 w-80 bg-brand-container rounded-2xl overflow-hidden border border-white/5 snap-start group hover:border-white/15 transition-all">
-                    <div className="h-48 relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-t from-brand-container to-transparent z-10"></div>
-                      <img 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 brightness-90 grayscale group-hover:grayscale-0" 
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvvkfMBu5pn1kAh_kAklwd4xw8YVKSTOzp9a0gte4MT8IoVjCNrqnVzc4WpTA0DQewGaqr0GA35XLEcgIVdt0DOIGKBkKsGp5pALNPfzWFIriX66evalZLPXQeYjue-6S6IV8X0AIhTF5PZF-9gSGJMInfninIj1swQIaDIbNsGP9wUaxo9I9fE-NKp8HsiWNliMeccri_ytiPw4IHKBAQD64IWmmAw0b_8wKLz2jv7rUYaoMig0Qd" 
-                        alt="Live Performance Stage"
-                        referrerPolicy="no-referrer"
-                      />
-                      <span className="absolute top-4 left-4 z-20 font-mono text-[10px] uppercase font-bold tracking-wider bg-brand-volt text-brand-bg px-2.5 py-1 rounded-md">LIVE</span>
-                    </div>
-                    <div className="p-6">
-                      <h4 className="font-display text-lg text-white font-semibold mb-2">Live Performance</h4>
-                      <p className="text-xs text-brand-text-muted leading-relaxed mb-4">Touring musicians, session players, and MDs for global arenas & festivals.</p>
-                      <div className="h-[2px] w-full bg-white/10 relative">
-                        <div className="absolute inset-0 bg-brand-volt w-1/3 shadow-[0_0_10px_rgba(195,244,0,0.5)]"></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Category 2 */}
-                  <div className="flex-shrink-0 w-80 bg-brand-container rounded-2xl overflow-hidden border border-white/5 snap-start group hover:border-white/15 transition-all">
-                    <div className="h-48 relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-t from-brand-container to-transparent z-10"></div>
-                      <img 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 brightness-90 grayscale group-hover:grayscale-0" 
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuDkYCSkvhRgRQxJjhNICtlXVynwTdPvzknbZLfJNyxAkFNQXLwiUVUUEp8zsD0J4hhDtQwUItpJzg4gCeX807LNxM3QuUryLylXSHoo_ExkusKlhLGVpjxufxIJBpXZHPpGTspIzOw5UuFF7vTmaKq8XFJDdbgaras-LedG-CLIuCRKhiqGGRX-un51NUHKGrqerDzEC5zY1muIz_7Nj0wTru8KtvZ2cFXBKHdlE0MSNnu7r452dyrx" 
-                        alt="Recording Studio Control Room"
-                        referrerPolicy="no-referrer"
-                      />
-                      <span className="absolute top-4 left-4 z-20 font-mono text-[10px] uppercase font-bold tracking-wider bg-white/10 text-white border border-white/20 px-2.5 py-1 rounded-md">ENGINEERING</span>
-                    </div>
-                    <div className="p-6">
-                      <h4 className="font-display text-lg text-white font-semibold mb-2">Studio Sessions</h4>
-                      <p className="text-xs text-brand-text-muted leading-relaxed mb-4">Grammy-caliber tracking, analog mixing, and mastering engineers.</p>
-                      <div className="h-[2px] w-full bg-white/10 relative">
-                        <div className="absolute inset-0 bg-brand-volt w-2/3 shadow-[0_0_10px_rgba(195,244,0,0.5)]"></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Category 3 */}
-                  <div className="flex-shrink-0 w-80 bg-brand-container rounded-2xl overflow-hidden border border-white/5 snap-start group hover:border-white/15 transition-all">
-                    <div className="h-48 relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-t from-brand-container to-transparent z-10"></div>
-                      <img 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 brightness-90 grayscale group-hover:grayscale-0" 
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZFUAqrIJupLJFxRytw0vaaH5-Ou6tPin04ADt6HYFlEUJW9TyxzlqF6XMf4qnzTiCyh0BQltjS26VDm6KuWGvu0mXBUAF1FbViS68O3HYfHxDRpVFO54bZoViuJ1tDe5I54J4ixFEqNFdpd1V85b6hKG4Gd_x4UkWbuuXgl5ni7w_Vs0_7mOi47ehfefj-ay1TUmFw2OVGRsDlLT4Mb2S8jh6znFr1Pdt-PnZRKF2MV0MMYpqhOHs" 
-                        alt="Music Production Workspace"
-                        referrerPolicy="no-referrer"
-                      />
-                      <span className="absolute top-4 left-4 z-20 font-mono text-[10px] uppercase font-bold tracking-wider bg-white/10 text-white border border-white/20 px-2.5 py-1 rounded-md">CREATIVE</span>
-                    </div>
-                    <div className="p-6">
-                      <h4 className="font-display text-lg text-white font-semibold mb-2">Production</h4>
-                      <p className="text-xs text-brand-text-muted leading-relaxed mb-4">Composers, beatmakers, synthesists, and dynamic creative directors.</p>
-                      <div className="h-[2px] w-full bg-white/10 relative">
-                        <div className="absolute inset-0 bg-brand-volt w-1/2 shadow-[0_0_10px_rgba(195,244,0,0.5)]"></div>
-                      </div>
-                    </div>
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {GIG_CATEGORIES.map((cat) => {
+                    const openCount = openQuests.filter(q => q.category === cat.key).length;
+                    return (
+                      <button
+                        key={cat.key}
+                        onClick={() => {
+                          setQuestCategoryFilter(cat.key);
+                          questsSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        className="text-left bg-brand-container rounded-2xl border border-white/5 p-6 hover:border-brand-volt/40 transition-all group"
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="font-mono text-[10px] uppercase font-bold tracking-wider bg-white/10 text-white border border-white/20 px-2.5 py-1 rounded-md group-hover:bg-brand-volt group-hover:text-brand-bg group-hover:border-brand-volt transition-colors">{cat.tag}</span>
+                          <span className="font-mono text-[10px] text-brand-text-muted">{openCount} open</span>
+                        </div>
+                        <h4 className="font-display text-lg text-white font-semibold mb-2">{cat.key}</h4>
+                        <p className="text-xs text-brand-text-muted leading-relaxed">{cat.blurb}</p>
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
 
@@ -1054,7 +993,7 @@ export default function App() {
                   
                   {/* Category filters */}
                   <div className="flex flex-wrap gap-2">
-                    {['All', 'Live Performance', 'Studio Sessions', 'Production'].map((cat) => (
+                    {['All', ...GIG_CATEGORY_KEYS].map((cat) => (
                       <button
                         key={cat}
                         onClick={() => setQuestCategoryFilter(cat)}
@@ -1079,7 +1018,7 @@ export default function App() {
                     type="text"
                     value={questSearch}
                     onChange={(e) => setQuestSearch(e.target.value)}
-                    placeholder="Search gigs (e.g., Atmos, Ableton, synth, bass)..."
+                    placeholder="Search gigs (e.g. photographer, logo, voiceover, DJ)..."
                     className="w-full bg-brand-container border border-white/10 focus:border-brand-volt focus:outline-none rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder:text-brand-text-muted"
                   />
                 </div>
@@ -1089,7 +1028,7 @@ export default function App() {
                   {openQuests.length === 0 && (
                     <div className="md:col-span-2 bg-brand-container border border-white/5 rounded-2xl p-10 text-center">
                       <p className="text-sm text-white font-semibold mb-1">No open quests right now</p>
-                      <p className="text-xs text-brand-text-muted mb-4">Studios: be the first to post one.</p>
+                      <p className="text-xs text-brand-text-muted mb-4">Gig providers: be the first to post one.</p>
                       <button onClick={openPostQuest} className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-5 py-2.5 rounded-xl">Post a Quest</button>
                     </div>
                   )}
@@ -1185,7 +1124,7 @@ export default function App() {
                       <div>
                         <h4 className="font-sans font-bold text-lg uppercase tracking-tight mb-2">Verified Profiles</h4>
                         <p className="text-sm font-medium text-brand-bg/80 leading-relaxed">
-                          Every talent on our platform undergoes a rigorous 3-stage vetting process including technical portfolio audits, references, and credit verification.
+                          Look for the verified badge: it means the SideQuests team has reviewed that creative's identity and portfolio.
                         </p>
                       </div>
                     </div>
@@ -1195,7 +1134,7 @@ export default function App() {
                       <div>
                         <h4 className="font-sans font-bold text-lg uppercase tracking-tight mb-2">Protected Payments</h4>
                         <p className="text-sm font-medium text-brand-bg/80 leading-relaxed">
-                          With Protected Payments, the studio pays up front and the money is only released to the creative when each milestone is approved, so nobody is left chasing an invoice.
+                          With Protected Payments, the gig provider pays up front and the money is only released to the creative when each milestone is approved, so nobody is left chasing an invoice.
                         </p>
                       </div>
                     </div>
@@ -1205,7 +1144,7 @@ export default function App() {
                       <div>
                         <h4 className="font-sans font-bold text-lg uppercase tracking-tight mb-2">Transparent Pricing</h4>
                         <p className="text-sm font-medium text-brand-bg/80 leading-relaxed">
-                          Flat, straightforward platform fees and zero hidden charges. You see exactly what the talent earns and exactly what the studio pays.
+                          Flat, straightforward platform fees and zero hidden charges. You see exactly what the creative earns and exactly what the gig provider pays.
                         </p>
                       </div>
                     </div>
@@ -1215,7 +1154,7 @@ export default function App() {
                       <div>
                         <h4 className="font-sans font-bold text-lg uppercase tracking-tight mb-2">Mediation Support</h4>
                         <p className="text-sm font-medium text-brand-bg/80 leading-relaxed">
-                          In the rare event of a dispute, our expert mediation team—composed of veteran audio professionals—steps in to resolve issues fairly.
+                          In the rare event of a dispute, the SideQuests team steps in to help both sides reach a fair outcome.
                         </p>
                       </div>
                     </div>
@@ -1235,8 +1174,8 @@ export default function App() {
                       onClick={() => handleStartCreateProfile('artist')} 
                       className="bg-brand-volt text-brand-bg font-sans font-bold text-sm px-8 py-4 rounded-xl hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-lg shadow-brand-volt/20 flex items-center justify-center gap-2"
                     >
-                      <Headphones className="w-4 h-4" />
-                      Join as Artist Talent
+                      <Palette className="w-4 h-4" />
+                      Join as a Creative
                     </button>
                     <button 
                       onClick={() => handleStartCreateProfile('provider')} 
@@ -1256,7 +1195,7 @@ export default function App() {
           {activeTab === 'creatives' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-10">
               <div className="mb-10">
-                <h3 className="font-display text-3xl md:text-4xl text-white font-semibold">The Artist Collective</h3>
+                <h3 className="font-display text-3xl md:text-4xl text-white font-semibold">The Creative Collective</h3>
                 <p className="text-brand-text-muted text-sm mt-1">Creatives on SideQuests. A check mark means SideQuests has verified the profile.</p>
               </div>
 
@@ -1270,18 +1209,15 @@ export default function App() {
                     type="text"
                     value={creativeSearch}
                     onChange={(e) => setCreativeSearch(e.target.value)}
-                    placeholder="Search by name, tags, credits or gear..."
+                    placeholder="Search by name, skill or keyword..."
                     className="w-full bg-brand-container border border-white/10 focus:border-brand-volt focus:outline-none rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder:text-brand-text-muted"
                   />
                 </div>
 
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { key: 'All', label: 'All Specialties' },
-                    { key: 'producer', label: 'Producers' },
-                    { key: 'engineer', label: 'Engineers' },
-                    { key: 'musician', label: 'Musicians' },
-                    { key: 'md', label: 'Music Directors' }
+                    { key: 'All', label: 'All' },
+                    ...GIG_CATEGORIES.map(c => ({ key: c.key, label: c.key }))
                   ].map((roleObj) => (
                     <button
                       key={roleObj.key}
@@ -1302,8 +1238,8 @@ export default function App() {
               {creatives.length === 0 && (
                 <div className="bg-brand-container border border-white/5 rounded-2xl p-10 text-center mb-6">
                   <p className="text-sm text-white font-semibold mb-1">No creatives have joined yet</p>
-                  <p className="text-xs text-brand-text-muted mb-4">Artists: create your profile to be listed here.</p>
-                  <button onClick={() => handleStartCreateProfile('artist')} className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-5 py-2.5 rounded-xl">Create Artist Profile</button>
+                  <p className="text-xs text-brand-text-muted mb-4">Creatives: create your profile to be listed here.</p>
+                  <button onClick={() => handleStartCreateProfile('artist')} className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-5 py-2.5 rounded-xl">Create Creative Profile</button>
                 </div>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1351,7 +1287,7 @@ export default function App() {
                           onClick={() => setSelectedCreative(creative)}
                           className="flex-1 text-white bg-white/5 border border-white/10 hover:bg-white/10 font-sans text-xs font-semibold py-2.5 rounded-lg transition-all"
                         >
-                          Portfolio & Gear
+                          View Profile
                         </button>
                         <button 
                           onClick={() => handleDirectHire(creative)}
@@ -1372,7 +1308,7 @@ export default function App() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-10">
               <div className="mb-12">
                 <h3 className="font-display text-3xl md:text-4xl text-white font-semibold">SideQuests Academy</h3>
-                <p className="text-brand-text-muted text-sm mt-1">High-editorial masterclasses and technical specifications for audio elite</p>
+                <p className="text-brand-text-muted text-sm mt-1">Practical guides for creatives and the people who hire them</p>
               </div>
 
               {/* Main feature Article */}
@@ -1399,7 +1335,7 @@ export default function App() {
                       onClick={() => setSelectedArticle(LEARN_ARTICLES[0])}
                       className="text-brand-volt font-sans font-semibold text-xs flex items-center gap-1.5 hover:gap-3 transition-all uppercase tracking-wider"
                     >
-                      Read Masterclass <ArrowRightAlt className="w-4 h-4 text-brand-volt" />
+                      Read Guide <ArrowRightAlt className="w-4 h-4 text-brand-volt" />
                     </button>
                   </div>
                 </div>
@@ -1433,7 +1369,7 @@ export default function App() {
                           onClick={() => setSelectedArticle(article)}
                           className="text-brand-volt font-sans font-semibold text-xs flex items-center gap-1"
                         >
-                          Open Spec <ArrowRightAlt className="w-4 h-4 text-brand-volt" />
+                          Read <ArrowRightAlt className="w-4 h-4 text-brand-volt" />
                         </button>
                       </div>
                     </div>
@@ -1448,7 +1384,7 @@ export default function App() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-10">
               <div className="mb-12 max-w-xl">
                 <h3 className="font-display text-3xl md:text-4xl text-white font-semibold">Platform Fees & Tiers</h3>
-                <p className="text-brand-text-muted text-sm mt-1">SideQuests keeps flat rates with absolute payment security. Choose your career speed.</p>
+                <p className="text-brand-text-muted text-sm mt-1">Simple, flat platform fees. Pricing will be confirmed when Protected Payments launches.</p>
               </div>
 
               {/* Pricing Cards */}
@@ -1460,7 +1396,7 @@ export default function App() {
                     <span className="font-mono text-xs text-brand-text-muted uppercase tracking-wider">CREATOR BASE</span>
                     <h4 className="font-display text-3xl text-white font-bold mt-1 mb-4">Flat Platform Fee</h4>
                     <p className="text-sm text-brand-text-muted leading-relaxed mb-6">
-                      For independent session artists, MDs, and engineers looking to secure payments using SideQuests Protected Payments.
+                      For independent creatives who want to get paid securely with SideQuests Protected Payments.
                     </p>
                     
                     <div className="flex items-baseline gap-1 mb-8">
@@ -1475,7 +1411,7 @@ export default function App() {
                       </li>
                       <li className="text-xs text-brand-text-muted flex items-center gap-2">
                         <Verified className="w-4 h-4 text-brand-volt flex-shrink-0" />
-                        <span>High-fidelity lossless WAV file transfers</span>
+                        <span>Secure file delivery for every gig</span>
                       </li>
                       <li className="text-xs text-brand-text-muted flex items-center gap-2">
                         <Verified className="w-4 h-4 text-brand-volt flex-shrink-0" />
@@ -1501,7 +1437,7 @@ export default function App() {
                     <span className="font-mono text-xs text-brand-volt uppercase tracking-wider">COLLECTIVE PRO</span>
                     <h4 className="font-display text-3xl text-white font-bold mt-1 mb-4">Infinite Autonomy</h4>
                     <p className="text-sm text-brand-text-muted leading-relaxed mb-6">
-                      For power-user studios, record labels, and premier touring musicians demanding instant booking and white-glove disputes.
+                      For busy creatives and gig providers who run lots of quests.
                     </p>
                     
                     <div className="flex items-baseline gap-1 mb-8">
@@ -1516,24 +1452,24 @@ export default function App() {
                       </li>
                       <li className="text-xs text-white flex items-center gap-2">
                         <Verified className="w-4 h-4 text-brand-volt flex-shrink-0" />
-                        <span className="font-medium">Unlimited gig files storage (lossless ADM BWF)</span>
+                        <span className="font-medium">More file storage for deliverables</span>
                       </li>
                       <li className="text-xs text-white flex items-center gap-2">
                         <Verified className="w-4 h-4 text-brand-volt flex-shrink-0" />
-                        <span className="font-medium">Priority 1-hour fast-track booking matchmaker</span>
+                        <span className="font-medium">Featured placement in search</span>
                       </li>
                       <li className="text-xs text-white flex items-center gap-2">
                         <Verified className="w-4 h-4 text-brand-volt flex-shrink-0" />
-                        <span className="font-medium">Direct live support chat with mediation team</span>
+                        <span className="font-medium">Priority support</span>
                       </li>
                     </ul>
                   </div>
 
                   <button 
-                    onClick={() => showToast('Checkout simulator activated! Collective Pro enabled.', 'success')}
+                    onClick={() => showToast('Collective Pro is coming soon.', 'info')}
                     className="w-full bg-brand-volt text-brand-bg font-sans font-extrabold text-xs py-3.5 rounded-xl hover:scale-[1.02] active:scale-95 transition-all shadow-md shadow-brand-volt/10 glow-btn"
                   >
-                    Upgrade to Collective Pro
+                    Coming Soon
                   </button>
                 </div>
 
@@ -1543,7 +1479,7 @@ export default function App() {
               <div className="bg-brand-container border border-white/5 p-8 rounded-2xl max-w-2xl mx-auto">
                 <h4 className="font-display text-xl text-white font-bold mb-2">Platform Fee Estimator</h4>
                 <p className="text-xs text-brand-text-muted leading-relaxed mb-6">
-                  Input your projected music production gig budget to view the standard SideQuests trust protection fee and compare layouts.
+                  Enter a gig budget to see the platform fee on each plan.
                 </p>
 
                 <div className="space-y-5">
@@ -1589,7 +1525,7 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* TASKS / MUSIC GIG OPERATING SYSTEM CONSOLE VIEW */}
+          {/* TASKS / GIG OPERATING SYSTEM CONSOLE VIEW */}
           {activeTab === 'tasks' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-6">
               
@@ -1942,7 +1878,7 @@ export default function App() {
                       </button>
                     ) : (
                       <button onClick={() => setActiveTab('creatives')} className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-6 py-3 rounded-xl hover:scale-105 transition-all">
-                        Browse Elite Creatives
+                        Browse Creatives
                       </button>
                     )}
                   </div>
@@ -1962,7 +1898,7 @@ export default function App() {
               ) : !currentUser ? (
                 <div className="max-w-md mx-auto bg-brand-container border border-white/10 rounded-3xl p-8 text-center my-10">
                   <h3 className="font-display text-2xl text-white font-bold mb-2">Your SideQuests profile</h3>
-                  <p className="text-sm text-brand-text-muted mb-6">Sign in or create a free account to set up your Artist or Studio profile.</p>
+                  <p className="text-sm text-brand-text-muted mb-6">Sign in or create a free account to set up your Creative or Gig Provider profile.</p>
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <button onClick={() => openAuth('signup')} className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-6 py-3 rounded-xl">Create Account</button>
                     <button onClick={() => openAuth('signin')} className="border border-white/15 text-white font-sans font-semibold text-xs px-6 py-3 rounded-xl hover:bg-white/5">Sign In</button>
@@ -2026,7 +1962,7 @@ export default function App() {
           <div>
             <h5 className="font-mono text-[10px] text-white uppercase tracking-widest mb-4 font-semibold">Company</h5>
             <ul className="space-y-2 text-xs text-brand-text-muted">
-              <li><button onClick={() => showToast('About SideQuests: Vetted gig networks for audio.', 'info')} className="hover:text-brand-volt transition-colors">About Us</button></li>
+              <li><button onClick={() => showToast('About SideQuests: the gig network for creatives of every kind.', 'info')} className="hover:text-brand-volt transition-colors">About Us</button></li>
               <li><button onClick={() => showToast('Protected Payments and verified profiles.', 'info')} className="hover:text-brand-volt transition-colors">Trust & Safety</button></li>
               <li><button onClick={() => showToast('GDPR Compliant Privacy Terms.', 'info')} className="hover:text-brand-volt transition-colors">Privacy Policy</button></li>
               <li><button onClick={() => showToast('Terms of Service and Dispute resolution rules.', 'info')} className="hover:text-brand-volt transition-colors">Terms of Service</button></li>
@@ -2199,7 +2135,7 @@ export default function App() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <h5 className="font-mono text-[10px] text-brand-volt uppercase tracking-widest block mb-2.5 font-bold">Verified Credits</h5>
+                    <h5 className="font-mono text-[10px] text-brand-volt uppercase tracking-widest block mb-2.5 font-bold">Credits & Past Work</h5>
                     <ul className="space-y-2">
                       {selectedCreative.credits.map((cr, idx) => (
                         <li key={idx} className="text-xs text-brand-text-muted flex items-start gap-2">
@@ -2211,7 +2147,7 @@ export default function App() {
                   </div>
 
                   <div>
-                    <h5 className="font-mono text-[10px] text-brand-volt uppercase tracking-widest block mb-2.5 font-bold">Hardware & DAW Spec</h5>
+                    <h5 className="font-mono text-[10px] text-brand-volt uppercase tracking-widest block mb-2.5 font-bold">Tools & Equipment</h5>
                     <ul className="space-y-2">
                       {selectedCreative.gear.map((g, idx) => (
                         <li key={idx} className="text-xs text-brand-text-muted flex items-start gap-2">

@@ -25,7 +25,7 @@ import {
   Payments, 
   LocationOn, 
   FolderZip, 
-  Headphones, 
+  Palette, 
   Mic, 
   Globe, 
   ArrowForward, 
@@ -105,9 +105,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
 
   // Gig Provider specific states
   const [organizationName, setOrganizationName] = useState(currentProfile.organizationName || '');
-  const [orgType, setOrgType] = useState<'Record Label' | 'Touring Agency' | 'Studio Facility' | 'Film / Game Audio' | 'Independent Producer' | 'Live Event Organizer'>(
-    currentProfile.orgType || 'Record Label'
-  );
+  const [orgType, setOrgType] = useState<string>(currentProfile.orgType || 'Brand / Business');
   const [budgetTier, setBudgetTier] = useState<'tier_under_5k' | 'tier_5k_25k' | 'tier_25k_100k' | 'tier_100k_plus'>(
     currentProfile.budgetTier || 'tier_5k_25k'
   );
@@ -123,15 +121,9 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
       if (!avatarUrl || AVATAR_PRESETS_PROVIDER.includes(avatarUrl)) {
         setAvatarUrl(AVATAR_PRESETS_ARTIST[0]);
       }
-      if (!roleHeadline || roleHeadline.includes('Executive') || roleHeadline.includes('Label')) {
-        setRoleHeadline('Live Music Director & Dolby Atmos Mix Engineer');
-      }
     } else {
       if (!avatarUrl || AVATAR_PRESETS_ARTIST.includes(avatarUrl)) {
         setAvatarUrl(AVATAR_PRESETS_PROVIDER[0]);
-      }
-      if (!roleHeadline || roleHeadline.includes('Engineer') || roleHeadline.includes('Musician')) {
-        setRoleHeadline('Executive Producer & Touring Talent Director');
       }
     }
   };
@@ -189,7 +181,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
 
   const handleSave = () => {
     if (!displayName.trim()) {
-      setSaveError('Please add your name (or your studio name) before publishing.');
+      setSaveError('Please add your name (or your business name) before publishing.');
       return;
     }
     if (selectedCategories.length === 0) {
@@ -259,7 +251,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
             Create Your <span className="text-brand-volt italic font-normal">SideQuests Profile</span>
           </h2>
           <p className="text-sm text-brand-text-muted mt-1 max-w-2xl leading-relaxed">
-            Join the verified operating system for music professionals. Showcase your sound, select specialized disciplines, or contract verified audio talent.
+            Join the gig network for creatives. Show off your work and skills to get hired, or find creative talent for your next project.
           </p>
         </div>
 
@@ -325,11 +317,11 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                       accountType === 'artist' ? 'bg-brand-volt text-brand-bg' : 'bg-white/5 text-white'
                     }`}>
-                      <Headphones className="w-5 h-5" />
+                      <Palette className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="text-base font-bold text-white font-display">Artist / Creative Talent</h4>
-                      <p className="text-xs text-brand-text-muted">Audio engineers, MDs, producers & musicians</p>
+                      <h4 className="text-base font-bold text-white font-display">Creative</h4>
+                      <p className="text-xs text-brand-text-muted">Photographers, designers, musicians, writers, performers & more</p>
                     </div>
                   </div>
                   {accountType === 'artist' && (
@@ -339,11 +331,11 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                   )}
                 </div>
                 <p className="text-xs text-brand-text-muted leading-relaxed">
-                  Apply to verified quests, get hired directly by major record labels and tour managers, and get paid milestone by milestone with Protected Payments.
+                  Apply to quests, get hired by brands, agencies and clients, and get paid milestone by milestone with Protected Payments.
                 </p>
               </div>
 
-              {/* Option 2: Gig Provider / Client / Producer */}
+              {/* Option 2: Gig Provider */}
               <div 
                 onClick={() => handleTypeChange('provider')}
                 className={`relative p-5 rounded-xl border cursor-pointer transition-all duration-200 ${
@@ -360,8 +352,8 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                       <Building2 className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="text-base font-bold text-white font-display">Gig Provider / Client / Label</h4>
-                      <p className="text-xs text-brand-text-muted">Labels, tour directors, artists & studios</p>
+                      <h4 className="text-base font-bold text-white font-display">Gig Provider</h4>
+                      <p className="text-xs text-brand-text-muted">Brands, agencies, event organizers & individuals</p>
                     </div>
                   </div>
                   {accountType === 'provider' && (
@@ -371,7 +363,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                   )}
                 </div>
                 <p className="text-xs text-brand-text-muted leading-relaxed">
-                  Post high-stakes quests, discover vetted audio veterans, manage contract milestones, and protect your budget with Protected Payments.
+                  Post quests, discover creative talent, manage milestones, and protect your budget with Protected Payments.
                 </p>
               </div>
             </div>
@@ -410,7 +402,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
               <div className="relative flex-grow">
                 <input 
                   type="text"
-                  placeholder="Search categories (e.g. Dolby Atmos, MD, Synth, Hip-Hop)..."
+                  placeholder="Search skills (e.g. photography, logo, voiceover, DJ)..."
                   value={categorySearch}
                   onChange={(e) => setCategorySearch(e.target.value)}
                   className="w-full bg-brand-container-high/80 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-brand-text-muted/60 focus:outline-none focus:border-brand-volt"
@@ -522,7 +514,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-mono uppercase tracking-wider text-brand-text-muted mb-2 font-semibold">
-                      {accountType === 'artist' ? 'Display / Artist Name' : 'Company / Organization Name'} *
+                      {accountType === 'artist' ? 'Display Name' : 'Company / Organization Name'} *
                     </label>
                     <input
                       type="text"
@@ -541,7 +533,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                       type="text"
                       value={handle}
                       onChange={(e) => setHandle(e.target.value)}
-                      placeholder="@devon_audio"
+                      placeholder="@yourname"
                       className="w-full bg-brand-container-high border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-brand-text-muted/60 focus:outline-none focus:border-brand-volt"
                     />
                   </div>
@@ -600,11 +592,9 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                         onChange={(e) => setOrgType(e.target.value as any)}
                         className="w-full bg-brand-container-high border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-volt"
                       >
-                        <option value="Record Label">Record Label</option>
-                        <option value="Touring Agency">Touring Agency</option>
-                        <option value="Studio Facility">Studio Facility</option>
-                        <option value="Film / Game Audio">Film / Game Audio</option>
-                        <option value="Independent Producer">Independent Producer</option>
+                        {['Brand / Business', 'Creative Agency', 'Production Company', 'Record Label / Music', 'Event Organizer', 'Publisher / Media', 'Startup', 'Nonprofit', 'Individual / Private Client'].map(o => (
+                          <option key={o} value={o}>{o}</option>
+                        ))}
                         <option value="Live Event Organizer">Live Event Organizer</option>
                       </select>
                     </div>
@@ -619,7 +609,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                     rows={4}
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
-                    placeholder="Briefly describe your experience, notable clients, sound signature, and operating approach..."
+                    placeholder="Briefly describe your experience, notable clients, style and how you like to work..."
                     className="w-full bg-brand-container-high border border-white/10 rounded-xl p-4 text-sm text-white placeholder:text-brand-text-muted/60 focus:outline-none focus:border-brand-volt leading-relaxed resize-none"
                   />
                 </div>
@@ -629,7 +619,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
               {accountType === 'artist' && (
                 <div className="bg-brand-container-low border border-white/10 rounded-2xl p-6 md:p-8 space-y-6">
                   <h3 className="text-base font-bold text-white font-display border-b border-white/10 pb-3">
-                    Talent Credentials & Key Gear
+                    Experience, Work & Tools
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -643,9 +633,9 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                         className="w-full bg-brand-container-high border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-volt"
                       >
                         <option value="emerging">Emerging Professional (1-3 yrs)</option>
-                        <option value="intermediate">Mid-Level Studio / Touring (3-6 yrs)</option>
-                        <option value="tour_veteran">Tour & Album Veteran (6+ yrs)</option>
-                        <option value="grammy_platinum">Grammy Nominated / Platinum Credits</option>
+                        <option value="intermediate">Established (3-6 yrs)</option>
+                        <option value="tour_veteran">Senior (6+ yrs)</option>
+                        <option value="grammy_platinum">Award-winning / Top of field</option>
                       </select>
                     </div>
 
@@ -660,8 +650,8 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                       >
                         <option value="available">Available Immediately</option>
                         <option value="booked_soon">Limited Openings (Next 30 Days)</option>
-                        <option value="remote_only">Remote Studio Only</option>
-                        <option value="tour_only">Touring Contract Only</option>
+                        <option value="remote_only">Remote Only</option>
+                        <option value="tour_only">On-location / Travel Only</option>
                       </select>
                     </div>
                   </div>
@@ -669,7 +659,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                   {/* Verified Credits */}
                   <div>
                     <label className="block text-xs font-mono uppercase tracking-wider text-brand-text-muted mb-2 font-semibold">
-                      Verified Credits & Notable Projects ({credits.length})
+                      Credits & Notable Projects ({credits.length})
                     </label>
                     <div className="flex gap-2 mb-3">
                       <input
@@ -677,7 +667,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                         value={newCreditInput}
                         onChange={(e) => setNewCreditInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCredit())}
-                        placeholder="e.g. Mix Engineer - Hyperion LP (Sony Music)"
+                        placeholder="e.g. Lookbook photography for Acme Apparel (2025)"
                         className="flex-grow bg-brand-container-high border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-brand-text-muted/60 focus:outline-none focus:border-brand-volt"
                       />
                       <button
@@ -707,10 +697,10 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                     </div>
                   </div>
 
-                  {/* Rig & Gear List */}
+                  {/* Tools & Equipment List */}
                   <div>
                     <label className="block text-xs font-mono uppercase tracking-wider text-brand-text-muted mb-2 font-semibold">
-                      Primary Rig & Studio Hardware ({gear.length})
+                      Tools & Equipment ({gear.length})
                     </label>
                     <div className="flex gap-2 mb-3">
                       <input
@@ -718,7 +708,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                         value={newGearInput}
                         onChange={(e) => setNewGearInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddGear())}
-                        placeholder="e.g. Sequential Prophet-6, PlayAUDIO12 Rig"
+                        placeholder="e.g. Sony A7 IV, Adobe Creative Suite, Pro Tools"
                         className="flex-grow bg-brand-container-high border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-brand-text-muted/60 focus:outline-none focus:border-brand-volt"
                       />
                       <button
@@ -745,21 +735,21 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                   {/* Portfolio links */}
                   <div>
                     <label className="block text-xs font-mono uppercase tracking-wider text-brand-text-muted mb-2 font-semibold">
-                      Streaming & Portfolio Links (Optional)
+                      Portfolio Links (Optional)
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <input
                         type="text"
                         value={spotifyLink}
                         onChange={(e) => setSpotifyLink(e.target.value)}
-                        placeholder="Spotify Artist URL"
+                        placeholder="Portfolio / Behance / Spotify URL"
                         className="w-full bg-brand-container-high border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-brand-text-muted/60 focus:outline-none focus:border-brand-volt"
                       />
                       <input
                         type="text"
                         value={soundcloudLink}
                         onChange={(e) => setSoundcloudLink(e.target.value)}
-                        placeholder="SoundCloud / Reel URL"
+                        placeholder="YouTube / Vimeo / SoundCloud / Reel URL"
                         className="w-full bg-brand-container-high border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-brand-text-muted/60 focus:outline-none focus:border-brand-volt"
                       />
                     </div>
@@ -781,10 +771,10 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                       {[
-                        { id: 'tier_under_5k', label: 'Under $5,000', sub: 'Indie & Single Stems' },
-                        { id: 'tier_5k_25k', label: '$5,000 - $25,000', sub: 'EP / Club Tour' },
-                        { id: 'tier_25k_100k', label: '$25k - $100k', sub: 'Major LP / Arena Tour' },
-                        { id: 'tier_100k_plus', label: '$100,000+', sub: 'Stadium / Global' }
+                        { id: 'tier_under_5k', label: 'Under $5,000', sub: 'Single gigs & small projects' },
+                        { id: 'tier_5k_25k', label: '$5,000 - $25,000', sub: 'Campaigns & events' },
+                        { id: 'tier_25k_100k', label: '$25k - $100k', sub: 'Large productions' },
+                        { id: 'tier_100k_plus', label: '$100,000+', sub: 'Enterprise & ongoing' }
                       ].map(t => (
                         <div
                           key={t.id}
@@ -813,7 +803,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                         value={newGoalInput}
                         onChange={(e) => setNewGoalInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddGoal())}
-                        placeholder="e.g. Seeking FOH Audio Engineer for 2026 amphitheater tour"
+                        placeholder="e.g. Looking for a wedding photographer for June"
                         className="flex-grow bg-brand-container-high border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-brand-text-muted/60 focus:outline-none focus:border-brand-volt"
                       />
                       <button
@@ -851,7 +841,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                         Protected Payments Enabled
                       </h4>
                       <p className="text-xs text-brand-text-muted mt-1 leading-relaxed">
-                        Gig providers pay for milestones up front with Protected Payments. Funds are only released when audio stems and deliverables meet contractual specifications.
+                        Gig providers pay for milestones up front with Protected Payments. Funds are only released when deliverables are approved.
                       </p>
                     </div>
                   </div>
@@ -1026,7 +1016,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                     <div className="flex items-center gap-2">
                       <h4 className="text-xl font-bold text-white font-display">{displayName || 'Unnamed Creative'}</h4>
                       <span className="px-2 py-0.5 rounded-full bg-brand-volt/10 text-brand-volt border border-brand-volt/20 text-[10px] font-mono uppercase font-bold">
-                        {accountType === 'artist' ? 'Verified Talent' : 'Gig Provider'}
+                        {accountType === 'artist' ? 'Creative' : 'Gig Provider'}
                       </span>
                     </div>
                     <div className="text-xs text-brand-text-muted font-mono mt-0.5">{handle}</div>

@@ -5,7 +5,8 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Quest, UserProfile } from '../types';
+import { Quest, UserProfile, GigCategory } from '../types';
+import { GIG_CATEGORY_KEYS } from '../categories';
 import { Close, Payments, VerifiedUser, Plus, Trash2, ArrowForward } from './Icons';
 
 interface PostQuestModalProps {
@@ -22,21 +23,17 @@ export const PostQuestModal: React.FC<PostQuestModalProps> = ({
   currentUser
 }) => {
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<'Live Performance' | 'Studio Sessions' | 'Production'>('Live Performance');
+  const [category, setCategory] = useState<GigCategory>('Photo & Video');
   const [budget, setBudget] = useState('3500');
   const [deadline, setDeadline] = useState('In 14 Days');
   const [description, setDescription] = useState('');
-  const [requirements, setRequirements] = useState<string[]>([
-    'Verified multi-track or tour experience',
-    'Ableton Live / Logic Pro / Pro Tools mastery',
-    'Immediate availability for rehearsals & recording'
-  ]);
+  const [requirements, setRequirements] = useState<string[]>([]);
   const [newReq, setNewReq] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   
   const [milestones, setMilestones] = useState<{ title: string; amount: number }[]>([
-    { title: 'Phase 1: Initial Stems & Arrangement Demo', amount: 1750 },
-    { title: 'Phase 2: Final Multi-track Delivery & Master Lock', amount: 1750 }
+    { title: 'Milestone 1: First draft / initial delivery', amount: 1750 },
+    { title: 'Milestone 2: Final delivery & sign-off', amount: 1750 }
   ]);
 
   if (!isOpen) return null;
@@ -63,13 +60,13 @@ export const PostQuestModal: React.FC<PostQuestModalProps> = ({
     const newQuest: Quest = {
       id: `quest_${Date.now()}`,
       title: title.trim(),
-      clientName: currentUser.displayName || 'Astral Tour Management',
+      clientName: currentUser.organizationName || currentUser.displayName || 'Gig Provider',
       clientAvatar: currentUser.avatarUrl || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=400&h=400&fit=crop',
       category,
       budget: totalBudget,
       deadline: deadline || 'In 14 Days',
       description: description.trim(),
-      requirements: requirements.length > 0 ? requirements : ['Pro audio verification', 'Immediate availability'],
+      requirements,
       milestones: [
         { title: milestones[0]?.title || 'Phase 1', amount: Math.round(totalBudget / 2) },
         { title: milestones[1]?.title || 'Phase 2', amount: totalBudget - Math.round(totalBudget / 2) }
@@ -111,7 +108,7 @@ export const PostQuestModal: React.FC<PostQuestModalProps> = ({
               Post a New Quest
             </h3>
             <p className="text-xs text-brand-text-muted mt-1">
-              Publish a verified contract to the SideQuests network with Protected Payments.
+              Describe the work and creatives can start applying right away.
             </p>
           </div>
 
@@ -125,7 +122,7 @@ export const PostQuestModal: React.FC<PostQuestModalProps> = ({
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Lead FOH Sound Engineer - 24-City Amphitheater Tour"
+                placeholder="e.g. Product photographer for a 20-item skincare launch"
                 className="w-full bg-brand-container-high border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-brand-text-muted/60 focus:outline-none focus:border-brand-volt"
               />
             </div>
@@ -133,16 +130,16 @@ export const PostQuestModal: React.FC<PostQuestModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-mono uppercase tracking-wider text-brand-text-muted mb-2 font-semibold">
-                  Discipline Category
+                  Category
                 </label>
                 <select
                   value={category}
-                  onChange={(e) => setCategory(e.target.value as any)}
+                  onChange={(e) => setCategory(e.target.value as GigCategory)}
                   className="w-full bg-brand-container-high border border-white/10 rounded-xl px-3 py-3 text-sm text-white focus:outline-none focus:border-brand-volt"
                 >
-                  <option value="Live Performance">Live Performance</option>
-                  <option value="Studio Sessions">Studio Sessions</option>
-                  <option value="Production">Production</option>
+                  {GIG_CATEGORY_KEYS.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
                 </select>
               </div>
 
@@ -161,8 +158,8 @@ export const PostQuestModal: React.FC<PostQuestModalProps> = ({
                       setBudget(val);
                       const num = parseFloat(val) || 0;
                       setMilestones([
-                        { title: 'Phase 1: Initial Stems & Arrangement Demo', amount: Math.round(num / 2) },
-                        { title: 'Phase 2: Final Multi-track Delivery & Master Lock', amount: num - Math.round(num / 2) }
+                        { title: 'Milestone 1: First draft / initial delivery', amount: Math.round(num / 2) },
+                        { title: 'Milestone 2: Final delivery & sign-off', amount: num - Math.round(num / 2) }
                       ]);
                     }}
                     className="w-full bg-brand-container-high border border-white/10 rounded-xl pl-8 pr-3 py-3 text-sm text-white focus:outline-none focus:border-brand-volt"
@@ -193,7 +190,7 @@ export const PostQuestModal: React.FC<PostQuestModalProps> = ({
                 required
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Detail the technical specifications, gear expectations, live dates or stem requirements..."
+                placeholder="What you need, deliverables, dates, location (or remote), and anything the creative should know..."
                 className="w-full bg-brand-container-high border border-white/10 rounded-xl p-4 text-sm text-white placeholder:text-brand-text-muted/60 focus:outline-none focus:border-brand-volt resize-none leading-relaxed"
               />
             </div>
@@ -209,7 +206,7 @@ export const PostQuestModal: React.FC<PostQuestModalProps> = ({
                   value={newReq}
                   onChange={(e) => setNewReq(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddRequirement())}
-                  placeholder="e.g. Must have touring experience with d&b line arrays"
+                  placeholder="e.g. Portfolio with e-commerce product shots"
                   className="flex-grow bg-brand-container-high border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-brand-text-muted/60 focus:outline-none focus:border-brand-volt"
                 />
                 <button

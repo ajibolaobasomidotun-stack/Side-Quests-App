@@ -13,7 +13,7 @@ import {
   Edit3, 
   LocationOn, 
   Payments, 
-  Headphones, 
+  Palette, 
   Building2, 
   Sparkles, 
   ArrowForward, 
@@ -64,27 +64,21 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     return found ? found.name : catId;
   });
 
-  // Matched Quests for Artists
-  const matchedQuests = quests.filter(quest => {
-    // If category matches any keyword or category
-    return profile.selectedCategories.some(catId => {
-      const cat = categoryPool.find(c => c.id === catId);
-      if (!cat) return false;
-      return quest.title.toLowerCase().includes(cat.name.toLowerCase().split(' ')[0].toLowerCase()) ||
-             quest.category.toLowerCase().includes(cat.group.toLowerCase().split(' ')[0].toLowerCase()) ||
-             quest.requirements.some(r => r.toLowerCase().includes(cat.name.toLowerCase().split(' ')[0].toLowerCase()));
-    });
-  });
+  // Creatives: open quests in the same disciplines as their skills
+  const myVerticals = new Set(
+    profile.selectedCategories
+      .map(catId => ARTIST_CATEGORIES.find(c => c.id === catId)?.group)
+      .filter(Boolean) as string[]
+  );
+  const matchedQuests = quests.filter(quest =>
+    quest.status === 'open' && quest.clientUid !== profile.id && myVerticals.has(quest.category)
+  );
 
-  // Matched Creatives for Gig Providers
-  const matchedCreatives = creatives.filter(creative => {
-    return profile.selectedCategories.some(catId => {
-      const cat = categoryPool.find(c => c.id === catId);
-      if (!cat) return false;
-      return creative.tags.some(t => t.toLowerCase().includes(cat.name.toLowerCase().split(' ')[0].toLowerCase())) ||
-             creative.roleLabel.toLowerCase().includes(cat.name.toLowerCase().split(' ')[0].toLowerCase());
-    });
-  });
+  // Gig providers: creatives in the disciplines they've posted quests for (or everyone, before their first quest)
+  const postedVerticals = new Set(quests.filter(q => q.clientUid === profile.id).map(q => q.category as string));
+  const matchedCreatives = creatives.filter(creative =>
+    creative.id !== profile.id && (postedVerticals.size === 0 || postedVerticals.has(creative.role))
+  );
 
   return (
     <div className="w-full max-w-5xl mx-auto py-6 md:py-10">
@@ -115,7 +109,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   {profile.displayName}
                 </h2>
                 <span className="px-2.5 py-0.5 rounded-full bg-brand-volt/15 text-brand-volt border border-brand-volt/30 text-xs font-mono font-bold uppercase">
-                  {profile.accountType === 'artist' ? 'Artist / Talent' : 'Studio / Gig Provider'}
+                  {profile.accountType === 'artist' ? 'Creative' : 'Gig Provider'}
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-white/5 text-brand-text-muted border border-white/10 text-xs font-mono">
                   {profile.verified ? 'Verified by SideQuests' : 'Verification pending'}
@@ -163,8 +157,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 </>
               ) : (
                 <>
-                  <Headphones className="w-3.5 h-3.5 text-brand-volt" />
-                  Switch to Artist Talent
+                  <Palette className="w-3.5 h-3.5 text-brand-volt" />
+                  Switch to Creative
                 </>
               )}
             </button>
@@ -283,7 +277,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           <div className="bg-brand-container-low border border-white/10 rounded-2xl p-6 md:p-8 space-y-6">
             <div>
               <h3 className="text-xs font-mono uppercase tracking-widest text-brand-text-muted mb-2 font-semibold">
-                Professional Bio & Sound Signature
+                About
               </h3>
               <p className="text-sm text-brand-text-muted leading-relaxed font-sans max-w-3xl">
                 {profile.bio || 'No bio provided.'}
@@ -311,7 +305,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
             </div>
 
-            {/* Artist specific credits & gear */}
+            {/* Creative-specific credits & tools */}
             {profile.accountType === 'artist' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-white/10">
                 <div>
@@ -331,10 +325,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
                 <div>
                   <h3 className="text-xs font-mono uppercase tracking-widest text-brand-text-muted mb-3 font-semibold">
-                    Live Rig & Studio Hardware
+                    Tools & Equipment
                   </h3>
                   <div className="flex flex-wrap gap-2">
-                    {(profile.gear || []).length === 0 && <p className="text-xs text-brand-text-muted">No gear added yet.</p>}
+                    {(profile.gear || []).length === 0 && <p className="text-xs text-brand-text-muted">No tools or equipment added yet.</p>}
                     {(profile.gear || []).map((item, i) => (
                       <span key={i} className="bg-brand-container-high border border-white/10 px-3 py-1.5 rounded-xl text-xs text-brand-text-muted font-mono">
                         {item}
@@ -416,7 +410,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     Quests Matching Your Categories
                   </h3>
                   <p className="text-xs text-brand-text-muted">
-                    Curated gigs based on your selected categories: {categoryNames.slice(0, 3).join(', ')}...
+                    Open quests in your disciplines: {Array.from(myVerticals).join(', ') || 'add skills to your profile to see matches'}
                   </p>
                 </div>
                 <button
@@ -459,10 +453,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-base font-bold text-white font-display">
-                    Verified Talent Matching Your Hiring Categories
+                    Creatives For Your Quests
                   </h3>
                   <p className="text-xs text-brand-text-muted">
-                    Vetted audio engineers and touring musicians ready for instant Protected Payments contracts.
+                    Creatives working in the same disciplines as the quests you've posted.
                   </p>
                 </div>
                 <button

@@ -6,215 +6,67 @@
 import { CategoryOption, UserProfile } from './types';
 
 export const ARTIST_CATEGORIES: CategoryOption[] = [
-  // Audio Engineering & Post
-  {
-    id: 'cat_dolby_atmos',
-    name: 'Dolby Atmos & Spatial Mix',
-    group: 'Audio Engineering & Post',
-    description: '7.1.4 immersive audio and spatial binaural rendering for Apple Music & Tidal'
-  },
-  {
-    id: 'cat_stereo_mix',
-    name: 'Stereo Mixing & Analog Summing',
-    group: 'Audio Engineering & Post',
-    description: 'High-end console mixing, dynamic separation, and balanced master bus processing'
-  },
-  {
-    id: 'cat_mastering',
-    name: 'Mastering & Stem Delivery',
-    group: 'Audio Engineering & Post',
-    description: 'Precision loudness optimization, dynamic range control, and DDP/streaming delivery'
-  },
-  {
-    id: 'cat_vocal_tuning',
-    name: 'Vocal Tuning & Processing',
-    group: 'Audio Engineering & Post',
-    description: 'Melodyne pitch correction, VocAlign phase alignment, and layered vocal chains'
-  },
-  {
-    id: 'cat_foh_live_sound',
-    name: 'Live Sound & FOH Engineer',
-    group: 'Audio Engineering & Post',
-    description: 'Front of House mixing, d&b/L-Acoustics system tuning, and wireless RF coordination'
-  },
-  {
-    id: 'cat_tracking_eng',
-    name: 'Studio Tracking Engineer',
-    group: 'Audio Engineering & Post',
-    description: 'Multi-mic drum tracking, preamp gain-staging, and high-fidelity live room recording'
-  },
-
-  // Music Production
-  {
-    id: 'cat_hiphop_prod',
-    name: 'Hip-Hop & Trap Production',
-    group: 'Music Production',
-    description: 'Punchy 808s, rhythmic drum programming, sample flipping, and modern beats'
-  },
-  {
-    id: 'cat_pop_rnb',
-    name: 'Pop & Modern R&B',
-    group: 'Music Production',
-    description: 'Lush chord voicing, acoustic-electronic hybrid arrangements, and radio-ready sound'
-  },
-  {
-    id: 'cat_electronic_edm',
-    name: 'Electronic / EDM / Synthwave',
-    group: 'Music Production',
-    description: 'Serum/Vital sound design, modular synthesis, drops, and club-tailored sound'
-  },
-  {
-    id: 'cat_cinematic_score',
-    name: 'Cinematic & Orchestral Score',
-    group: 'Music Production',
-    description: 'Hollywood-grade string libraries, brass dynamics, trailer cues, and film themes'
-  },
-  {
-    id: 'cat_afrobeat_global',
-    name: 'Afrobeat & Global Grooves',
-    group: 'Music Production',
-    description: 'Polyrhythmic percussion, highlife guitar riffs, log drums, and syncopated grooves'
-  },
-  {
-    id: 'cat_indie_rock',
-    name: 'Indie Rock & Alternative',
-    group: 'Music Production',
-    description: 'Live guitar textures, fuzz pedals, dynamic drum performances, and raw energy'
-  },
-
-  // Live Performance & Touring
-  {
-    id: 'cat_music_director',
-    name: 'Music Director (MD)',
-    group: 'Live Performance & Touring',
-    description: 'Arranging live tour sets, band transitions, click/cue stems, and stage direction'
-  },
-  {
-    id: 'cat_keys_synth',
-    name: 'Session Keys & Synth Player',
-    group: 'Live Performance & Touring',
-    description: 'Prophet/Nord/MainStage performance, piano improvisation, and vocoder patches'
-  },
-  {
-    id: 'cat_drums_percussion',
-    name: 'Touring Drummer & Hybrid Kit',
-    group: 'Live Performance & Touring',
-    description: 'Roland SPD-SX sample triggering, solid pocket groove, and click-track precision'
-  },
-  {
-    id: 'cat_bass_synthbass',
-    name: 'Bass Guitar & Synth Bass',
-    group: 'Live Performance & Touring',
-    description: 'Moog Minitaur sub-bass, 5-string slap & fingerstyle, and in-ear monitoring lock'
-  },
-  {
-    id: 'cat_guitarist',
-    name: 'Lead & Rhythm Guitarist',
-    group: 'Live Performance & Touring',
-    description: 'Quad Cortex / Helix amp modeling, acoustic fingerpicking, and solo virtuosity'
-  },
-  {
-    id: 'cat_playback_eng',
-    name: 'Playback & Ableton Rig Tech',
-    group: 'Live Performance & Touring',
-    description: 'Redundant dual PlayAUDIO12 systems, SMPTE timecode sync, and MIDI patch automation'
-  },
-
-  // Songwriting & Arranging
-  {
-    id: 'cat_toplining',
-    name: 'Toplining & Melodic Hooks',
-    group: 'Songwriting & Arranging',
-    description: 'Catchy vocal melodies, chorus hooks, and memorable phrasing for chart records'
-  },
-  {
-    id: 'cat_lyric_writing',
-    name: 'Lyric Writing & Polish',
-    group: 'Songwriting & Arranging',
-    description: 'Storytelling, emotional resonance, rhyming schemes, and concept development'
-  },
-  {
-    id: 'cat_string_horn_arr',
-    name: 'String & Horn Section Arranging',
-    group: 'Songwriting & Arranging',
-    description: 'Score notation, voicing distributions, and conductor sheet preparation'
-  }
+  // Music & Audio
+  { id: 'cat_music_production', name: 'Music Production', group: 'Music & Audio', description: 'Beats, arrangements and full productions across genres' },
+  { id: 'cat_stereo_mix', name: 'Mixing & Mastering', group: 'Music & Audio', description: 'Release-ready mixes, masters and stem deliveries' },
+  { id: 'cat_session_musician', name: 'Session Musician', group: 'Music & Audio', description: 'Studio and live instrumental performance' },
+  { id: 'cat_vocalist', name: 'Vocalist & Songwriter', group: 'Music & Audio', description: 'Lead and backing vocals, toplines and lyrics' },
+  { id: 'cat_composer', name: 'Composer (Film, Game & Ads)', group: 'Music & Audio', description: 'Original scores, jingles and sonic branding' },
+  { id: 'cat_sound_design', name: 'Sound Design & Podcast Editing', group: 'Music & Audio', description: 'SFX, audio post-production and podcast editing' },
+  { id: 'cat_dj', name: 'DJ', group: 'Music & Audio', description: 'Club, private, brand and wedding DJ sets' },
+  { id: 'cat_foh_live_sound', name: 'Live Sound Engineer', group: 'Music & Audio', description: 'Front-of-house, monitors and event audio' },
+  // Photo & Video
+  { id: 'cat_photo_portrait', name: 'Portrait & Event Photography', group: 'Photo & Video', description: 'Headshots, weddings, parties and live events' },
+  { id: 'cat_photo_product', name: 'Product & Commercial Photography', group: 'Photo & Video', description: 'E-commerce, food, fashion and brand campaigns' },
+  { id: 'cat_videography', name: 'Videography', group: 'Photo & Video', description: 'Shooting brand films, events, music videos and interviews' },
+  { id: 'cat_video_editing', name: 'Video Editing', group: 'Photo & Video', description: 'Short-form, long-form, YouTube and ad edits' },
+  { id: 'cat_motion', name: 'Motion Graphics & Animation', group: 'Photo & Video', description: '2D/3D animation, titles and explainer videos' },
+  { id: 'cat_color_drone', name: 'Colour Grading & Drone', group: 'Photo & Video', description: 'Colour correction, grading and aerial footage' },
+  // Design & Illustration
+  { id: 'cat_brand_design', name: 'Brand & Graphic Design', group: 'Design & Illustration', description: 'Logos, identities, packaging and print' },
+  { id: 'cat_illustration', name: 'Illustration', group: 'Design & Illustration', description: 'Editorial, book, character and merch illustration' },
+  { id: 'cat_uiux', name: 'UI/UX & Web Design', group: 'Design & Illustration', description: 'App and website design, prototypes and design systems' },
+  { id: 'cat_3d', name: '3D & CGI', group: 'Design & Illustration', description: '3D modelling, product renders and visualisation' },
+  { id: 'cat_fine_art', name: 'Fine Art & Murals', group: 'Design & Illustration', description: 'Commissions, murals and live painting' },
+  // Writing & Content
+  { id: 'cat_copywriting', name: 'Copywriting', group: 'Writing & Content', description: 'Ads, websites, emails and brand voice' },
+  { id: 'cat_scriptwriting', name: 'Scriptwriting', group: 'Writing & Content', description: 'Scripts for video, film, podcasts and ads' },
+  { id: 'cat_social_media', name: 'Social Media Management', group: 'Writing & Content', description: 'Content calendars, posting and community' },
+  { id: 'cat_ugc', name: 'UGC & Content Creation', group: 'Writing & Content', description: 'Creator-style videos and photos for brands' },
+  { id: 'cat_editing', name: 'Editing & Proofreading', group: 'Writing & Content', description: 'Books, articles, scripts and marketing copy' },
+  // Performance & Events
+  { id: 'cat_actor', name: 'Acting', group: 'Performance & Events', description: 'Film, commercial, theatre and brand content roles' },
+  { id: 'cat_dancer', name: 'Dance & Choreography', group: 'Performance & Events', description: 'Performers and choreographers for shows and videos' },
+  { id: 'cat_host', name: 'Host & MC', group: 'Performance & Events', description: 'Event hosting, presenting and livestreams' },
+  { id: 'cat_voice', name: 'Voice Acting & Voiceover', group: 'Performance & Events', description: 'Commercials, animation, audiobooks and e-learning' },
+  { id: 'cat_model', name: 'Modelling', group: 'Performance & Events', description: 'Fashion, commercial and brand shoots' },
+  { id: 'cat_live_performer', name: 'Live Entertainment', group: 'Performance & Events', description: 'Comedians, magicians, bands and roaming acts' },
+  // Fashion & Beauty
+  { id: 'cat_makeup', name: 'Makeup Artistry', group: 'Fashion & Beauty', description: 'Bridal, editorial, film and SFX makeup' },
+  { id: 'cat_hair', name: 'Hair Styling', group: 'Fashion & Beauty', description: 'Editorial, bridal and on-set hair' },
+  { id: 'cat_wardrobe', name: 'Wardrobe Styling', group: 'Fashion & Beauty', description: 'Styling for shoots, shows, events and talent' },
+  { id: 'cat_fashion_design', name: 'Fashion Design & Tailoring', group: 'Fashion & Beauty', description: 'Custom pieces, costumes and alterations' }
 ];
 
 export const PROVIDER_CATEGORIES: CategoryOption[] = [
-  // Live & Touring
-  {
-    id: 'prov_arena_tour',
-    name: 'Arena & Stadium Tours',
-    group: 'Live & Touring Productions',
-    description: 'Seeking verified touring band members, FOH engineers, and playback operators'
-  },
-  {
-    id: 'prov_festival_stage',
-    name: 'Festival & Headline Bookings',
-    group: 'Live & Touring Productions',
-    description: 'Contracting session talent, live backing vocalists, and musical directors'
-  },
-  {
-    id: 'prov_club_theater',
-    name: 'Club & Theater Tours',
-    group: 'Live & Touring Productions',
-    description: 'Mid-scale touring packages, tour managers, and multi-instrumentalists'
-  },
-
-  // Record Labels & Studio Releases
-  {
-    id: 'prov_major_label',
-    name: 'Major Label Album Releases',
-    group: 'Studio & Commercial Releases',
-    description: 'Commercial mix engineers, Dolby Atmos specialists, and platinum producers'
-  },
-  {
-    id: 'prov_indie_ep',
-    name: 'Indie Artist EP / Single Rollout',
-    group: 'Studio & Commercial Releases',
-    description: 'End-to-end production, acoustic tracking, and budget-friendly polish'
-  },
-  {
-    id: 'prov_remote_mixing',
-    name: 'Remote Stem Mixing & Mastering',
-    group: 'Studio & Commercial Releases',
-    description: 'Fast-turnaround mix revisions, analog hardware summing, and stem deliverable packs'
-  },
-
-  // Sync, Media & Game Audio
-  {
-    id: 'prov_game_audio',
-    name: 'Video Game Soundtrack & SFX',
-    group: 'Sync, Film & Game Audio',
-    description: 'Interactive audio layers, adaptive combat themes, and Foley sound design'
-  },
-  {
-    id: 'prov_film_doc',
-    name: 'Film, TV & Documentary Scoring',
-    group: 'Sync, Film & Game Audio',
-    description: 'Orchestral composition, emotion-driven cues, and quick director revision cycles'
-  },
-  {
-    id: 'prov_commercial_brand',
-    name: 'Commercial & Brand Sonic Identity',
-    group: 'Sync, Film & Game Audio',
-    description: 'Bespoke mnemonic audio logos, 30s ad scoring, and social media sound assets'
-  },
-
-  // Technical Operations & Playback
-  {
-    id: 'prov_playback_ops',
-    name: 'Redundant Playback Systems',
-    group: 'Technical Operations',
-    description: 'Hiring PlayAUDIO12/Ableton live rigs and timecode automation engineers'
-  },
-  {
-    id: 'prov_vocal_tuning_stems',
-    name: 'Vocal Stem Pitch & Time Correction',
-    group: 'Technical Operations',
-    description: 'High-volume Melodyne / VocAlign editing for recording artists'
-  }
+  // Brands & Businesses
+  { id: 'prov_brand_campaign', name: 'Brand Campaigns', group: 'Brands & Businesses', description: 'Photo, video and design for launches and campaigns' },
+  { id: 'prov_social_content', name: 'Social & UGC Content', group: 'Brands & Businesses', description: 'Ongoing content for social channels and ads' },
+  { id: 'prov_small_business', name: 'Small Business Marketing', group: 'Brands & Businesses', description: 'Logos, websites, menus, product photos' },
+  { id: 'prov_ecommerce', name: 'E-commerce & Product', group: 'Brands & Businesses', description: 'Product photography, listings and packaging' },
+  // Media & Entertainment
+  { id: 'prov_film_tv', name: 'Film, TV & Streaming', group: 'Media & Entertainment', description: 'Crew, cast, post-production and scoring' },
+  { id: 'prov_music_release', name: 'Music Releases & Tours', group: 'Media & Entertainment', description: 'Producers, musicians, videos and artwork' },
+  { id: 'prov_podcast', name: 'Podcasts & YouTube', group: 'Media & Entertainment', description: 'Editing, thumbnails, scripts and hosting' },
+  { id: 'prov_games', name: 'Games & Interactive', group: 'Media & Entertainment', description: 'Art, animation, audio and voice' },
+  { id: 'prov_publishing', name: 'Publishing', group: 'Media & Entertainment', description: 'Illustration, editing and cover design' },
+  // Events
+  { id: 'prov_weddings', name: 'Weddings & Private Events', group: 'Events', description: 'Photographers, DJs, makeup and entertainment' },
+  { id: 'prov_corporate', name: 'Corporate Events', group: 'Events', description: 'Hosts, AV, photo/video and performers' },
+  { id: 'prov_festivals', name: 'Concerts & Festivals', group: 'Events', description: 'Performers, crew and event content' },
+  // Agencies & Studios
+  { id: 'prov_agency_overflow', name: 'Agency Overflow', group: 'Agencies & Studios', description: 'Freelancers to extend your in-house team' },
+  { id: 'prov_production_company', name: 'Production Company Crew', group: 'Agencies & Studios', description: 'Shoot days, crew and post-production' }
 ];
 
 export const INITIAL_USER_PROFILE: UserProfile = {
