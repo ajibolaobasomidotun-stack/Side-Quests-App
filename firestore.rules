@@ -23,6 +23,12 @@ service cloud.firestore {
       return incoming().diff(existing()).affectedKeys().hasOnly(keys);
     }
 
+    // Profile pictures are small JPEG data URLs (~256px) or https links (e.g. Google photo).
+    function smallImageOrAbsent(field) {
+      return !(field in incoming())
+        || (incoming()[field] is string && incoming()[field].size() <= 150000);
+    }
+
     function userDoc(userId) {
       return get(/databases/$(database)/documents/users/$(userId));
     }
@@ -47,12 +53,14 @@ service cloud.firestore {
       allow create: if isSignedIn() && uid() == userId
         && incoming().accountType in ['artist', 'provider']
         && !('verified' in incoming())
-        && !('email' in incoming());
+        && !('email' in incoming())
+        && smallImageOrAbsent('avatarUrl');
 
       allow update: if isSignedIn() && uid() == userId
         && incoming().accountType in ['artist', 'provider']
         && incoming().get('verified', false) == existing().get('verified', false)
-        && !('email' in incoming());
+        && !('email' in incoming())
+        && smallImageOrAbsent('avatarUrl');
 
       allow delete: if isSignedIn() && uid() == userId;
     }
@@ -69,7 +77,8 @@ service cloud.firestore {
         && incoming().title is string && incoming().title.size() >= 3 && incoming().title.size() <= 140
         && incoming().description is string && incoming().description.size() <= 5000
         && incoming().budget is number && incoming().budget > 0 && incoming().budget <= 1000000
-        && incoming().milestones is list && incoming().milestones.size() >= 1 && incoming().milestones.size() <= 10;
+        && incoming().milestones is list && incoming().milestones.size() >= 1 && incoming().milestones.size() <= 10
+        && smallImageOrAbsent('clientAvatar');
 
       allow update: if isSignedIn() && existing().clientUid == uid()
         && incoming().clientUid == existing().clientUid
@@ -95,7 +104,8 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/quests/$(incoming().questId))
         && get(/databases/$(database)/documents/quests/$(incoming().questId)).data.status == 'open'
         && incoming().clientUid == get(/databases/$(database)/documents/quests/$(incoming().questId)).data.clientUid
-        && incoming().clientUid != uid();
+        && incoming().clientUid != uid()
+        && smallImageOrAbsent('applicantAvatar');
 
       // The studio can accept or decline; nothing else about the application changes.
       allow update: if isSignedIn() && existing().clientUid == uid()

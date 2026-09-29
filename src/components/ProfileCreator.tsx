@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
+import { Avatar } from './Avatar';
+import { photoToAvatarDataUrl, ImageError } from '../lib/image';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   UserProfile, 
@@ -16,6 +18,7 @@ import {
 } from '../profileData';
 import { 
   Verified, 
+  FileUpload,
   VerifiedUser, 
   Check, 
   Plus, 
@@ -42,21 +45,6 @@ interface ProfileCreatorProps {
   onNavigateToExplore?: () => void;
 }
 
-const AVATAR_PRESETS_ARTIST = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=400&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=400&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=400&h=400&fit=crop'
-];
-
-const AVATAR_PRESETS_PROVIDER = [
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=400&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=400&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?q=80&w=400&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=400&h=400&fit=crop'
-];
-
 export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
   currentProfile,
   onSaveProfile,
@@ -73,7 +61,24 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
   const [roleHeadline, setRoleHeadline] = useState(currentProfile.roleHeadline || '');
   const [bio, setBio] = useState(currentProfile.bio || '');
   const [location, setLocation] = useState(currentProfile.location || '');
-  const [avatarUrl, setAvatarUrl] = useState(currentProfile.avatarUrl || AVATAR_PRESETS_ARTIST[0]);
+  const [avatarUrl, setAvatarUrl] = useState(currentProfile.avatarUrl || '');
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoSelected = async (file?: File | null) => {
+    if (!file) return;
+    setPhotoBusy(true);
+    setPhotoError(null);
+    try {
+      setAvatarUrl(await photoToAvatarDataUrl(file));
+    } catch (err) {
+      setPhotoError(err instanceof ImageError ? err.message : 'Could not use that photo. Please try another.');
+    } finally {
+      setPhotoBusy(false);
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
+  };
   const [selectedCategories, setSelectedCategories] = useState<string[]>(currentProfile.selectedCategories || []);
   
   // Category search/filter
@@ -117,15 +122,6 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
   // Handle switching account type
   const handleTypeChange = (type: AccountType) => {
     setAccountType(type);
-    if (type === 'artist') {
-      if (!avatarUrl || AVATAR_PRESETS_PROVIDER.includes(avatarUrl)) {
-        setAvatarUrl(AVATAR_PRESETS_ARTIST[0]);
-      }
-    } else {
-      if (!avatarUrl || AVATAR_PRESETS_ARTIST.includes(avatarUrl)) {
-        setAvatarUrl(AVATAR_PRESETS_PROVIDER[0]);
-      }
-    }
   };
 
   // Toggle category selection
@@ -197,7 +193,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
       roleHeadline: roleHeadline.trim(),
       bio: bio.trim(),
       location: location.trim(),
-      avatarUrl: avatarUrl || (accountType === 'artist' ? AVATAR_PRESETS_ARTIST[0] : AVATAR_PRESETS_PROVIDER[0]),
+      avatarUrl,
       selectedCategories,
       
       hourlyRate: accountType === 'artist' ? Number(hourlyRate) || 120 : undefined,
@@ -507,7 +503,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                 <h3 className="text-base font-bold text-white font-display border-b border-white/10 pb-3 flex items-center justify-between">
                   <span>General Information</span>
                   <span className="text-xs font-mono text-brand-volt uppercase font-normal">
-                    {accountType === 'artist' ? 'Artist Account' : 'Gig Provider'}
+                    {accountType === 'artist' ? 'Creative Account' : 'Gig Provider Account'}
                   </span>
                 </h3>
 
@@ -520,7 +516,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                       type="text"
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
-                      placeholder={accountType === 'artist' ? 'e.g. Devon Thorne' : 'e.g. Astral Tour Management'}
+                      placeholder={accountType === 'artist' ? 'e.g. Jordan Lee' : 'e.g. Bright Day Events'}
                       className="w-full bg-brand-container-high border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-brand-text-muted/60 focus:outline-none focus:border-brand-volt"
                     />
                   </div>
@@ -547,7 +543,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                     type="text"
                     value={roleHeadline}
                     onChange={(e) => setRoleHeadline(e.target.value)}
-                    placeholder={accountType === 'artist' ? 'e.g. Live Music Director & Dolby Atmos Mix Engineer' : 'e.g. A&R Executive & Stadium Tour Producer'}
+                    placeholder={accountType === 'artist' ? 'e.g. Portrait & Brand Photographer' : 'e.g. Marketing Manager at Bright Day Events'}
                     className="w-full bg-brand-container-high border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-brand-text-muted/60 focus:outline-none focus:border-brand-volt"
                   />
                 </div>
@@ -854,53 +850,57 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
             {/* Right Col: Avatar & Selected Categories Summary */}
             <div className="space-y-6">
               
-              {/* Avatar Selector Card */}
+              {/* Profile Picture Upload */}
               <div className="bg-brand-container-low border border-white/10 rounded-2xl p-6">
                 <h3 className="text-xs font-mono uppercase tracking-widest text-brand-text-muted mb-4 font-semibold">
-                  Profile Avatar
+                  Profile Picture
                 </h3>
 
                 <div className="flex items-center gap-4 mb-4">
-                  <img
-                    src={avatarUrl}
-                    alt={displayName || 'Avatar'}
-                    referrerPolicy="no-referrer"
-                    className="w-16 h-16 rounded-2xl object-cover border-2 border-brand-volt/60 shadow-lg shadow-brand-volt/10"
-                  />
-                  <div>
-                    <div className="text-sm font-bold text-white">{displayName || 'Your Profile'}</div>
-                    <div className="text-xs text-brand-volt font-mono">{handle || '@handle'}</div>
+                  <Avatar src={avatarUrl} name={displayName} className="w-20 h-20 rounded-2xl border-2 border-brand-volt/60 text-2xl" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-white truncate">{displayName || 'Your Profile'}</div>
+                    <div className="text-xs text-brand-volt font-mono truncate">{handle || '@handle'}</div>
                   </div>
                 </div>
 
-                <div className="text-xs text-brand-text-muted mb-2 font-mono">Select Avatar Preset:</div>
-                <div className="grid grid-cols-5 gap-2 mb-4">
-                  {(accountType === 'artist' ? AVATAR_PRESETS_ARTIST : AVATAR_PRESETS_PROVIDER).map((url, idx) => (
-                    <img
-                      key={idx}
-                      src={url}
-                      alt="Preset"
-                      referrerPolicy="no-referrer"
-                      onClick={() => setAvatarUrl(url)}
-                      className={`w-10 h-10 rounded-xl object-cover cursor-pointer border-2 transition-all ${
-                        avatarUrl === url ? 'border-brand-volt scale-105' : 'border-transparent opacity-60 hover:opacity-100'
-                      }`}
-                    />
-                  ))}
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handlePhotoSelected(e.target.files?.[0])}
+                />
+
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => photoInputRef.current?.click()}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); photoInputRef.current?.click(); } }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); handlePhotoSelected(e.dataTransfer.files?.[0]); }}
+                  className="border border-dashed border-white/20 hover:border-brand-volt/60 rounded-xl p-4 text-center cursor-pointer transition-colors"
+                >
+                  <FileUpload className="w-5 h-5 text-brand-volt mx-auto mb-1.5" />
+                  <p className="text-xs text-white font-semibold">
+                    {photoBusy ? 'Processing…' : avatarUrl ? 'Change photo' : 'Upload a photo'}
+                  </p>
+                  <p className="text-[10px] text-brand-text-muted mt-0.5">Click or drag an image here. JPG, PNG or HEIC, up to 15 MB.</p>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-mono text-brand-text-muted uppercase mb-1">
-                    Or paste custom Image URL:
-                  </label>
-                  <input
-                    type="text"
-                    value={avatarUrl}
-                    onChange={(e) => setAvatarUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="w-full bg-brand-container-high border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-volt"
-                  />
-                </div>
+                {avatarUrl && !photoBusy && (
+                  <button
+                    type="button"
+                    onClick={() => setAvatarUrl('')}
+                    className="mt-3 text-[11px] text-brand-text-muted hover:text-red-300 underline"
+                  >
+                    Remove photo
+                  </button>
+                )}
+                {photoError && <p className="mt-2 text-xs text-red-400" role="alert">{photoError}</p>}
+                <p className="mt-3 text-[10px] text-brand-text-muted leading-relaxed">
+                  Use a clear photo of yourself{accountType === 'provider' ? ' or your logo' : ''}. It's cropped to a square and shown on your profile, quests and applications.
+                </p>
               </div>
 
               {/* Selected Categories Summary Card */}
@@ -1002,15 +1002,12 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-white/10">
                 <div className="flex items-center gap-4">
                   <div className="relative">
-                    <img
-                      src={avatarUrl}
-                      alt={displayName}
-                      referrerPolicy="no-referrer"
-                      className="w-20 h-20 rounded-2xl object-cover border-2 border-brand-volt shadow-lg"
-                    />
-                    <span className="absolute -bottom-1 -right-1 p-1 bg-brand-bg rounded-lg border border-brand-volt/40">
-                      <Verified className="w-4 h-4 text-brand-volt" />
-                    </span>
+                    <Avatar src={avatarUrl} name={displayName} className="w-20 h-20 rounded-2xl border-2 border-brand-volt shadow-lg text-2xl" />
+                    {currentProfile.verified && (
+                      <span className="absolute -bottom-1 -right-1 p-1 bg-brand-bg rounded-lg border border-brand-volt/40">
+                        <Verified className="w-4 h-4 text-brand-volt" />
+                      </span>
+                    )}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">

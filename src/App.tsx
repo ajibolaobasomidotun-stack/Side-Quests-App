@@ -60,6 +60,7 @@ import { PostQuestModal } from './components/PostQuestModal';
 import { AuthModal } from './components/AuthModal';
 import { ApplyModal } from './components/ApplyModal';
 import { Dashboard } from './components/Dashboard';
+import { Avatar } from './components/Avatar';
 import {
   auth,
   signOutUser,
@@ -241,7 +242,7 @@ export default function App() {
         name: p.displayName,
         role,
         roleLabel: p.roleHeadline || 'Creative',
-        avatarUrl: p.avatarUrl || 'https://ui-avatars.com/api/?background=1a1a1a&color=c3f400&name=' + encodeURIComponent(p.displayName),
+        avatarUrl: p.avatarUrl || '',
         bio: p.bio || '',
         verified: p.verified === true,
         rating: 0,
@@ -737,12 +738,7 @@ export default function App() {
                     : 'bg-white/5 border-white/10 hover:border-white/20 text-white'
                 }`}
               >
-                <img 
-                  src={currentUser.photoURL || userProfile.avatarUrl} 
-                  alt={currentUser.displayName || userProfile.displayName} 
-                  className="w-5 h-5 rounded-full object-cover border border-brand-volt/40"
-                  referrerPolicy="no-referrer"
-                />
+                <Avatar src={userProfile.avatarUrl || currentUser.photoURL || ''} name={userProfile.displayName || currentUser.displayName || ''} className="w-5 h-5 rounded-full border border-brand-volt/40 text-[8px]" />
                 <span className="hidden sm:inline font-sans text-xs font-semibold max-w-[110px] truncate text-white">
                   {(currentUser.displayName || userProfile.displayName).split(' ')[0]}
                 </span>
@@ -1043,7 +1039,7 @@ export default function App() {
                         <div>
                           <div className="flex justify-between items-start gap-4 mb-4">
                             <div className="flex items-center gap-3">
-                              <img className="w-10 h-10 rounded-lg object-cover" src={quest.clientAvatar} alt={quest.clientName} referrerPolicy="no-referrer" />
+                              <Avatar src={quest.clientAvatar} name={quest.clientName} className="w-10 h-10 rounded-lg text-sm" />
                               <div>
                                 <span className="text-brand-text-muted text-[10px] font-mono uppercase tracking-wider">{quest.clientName}</span>
                                 <span className="block font-mono text-[10px] text-brand-volt uppercase tracking-wider mt-0.5">{quest.category}</span>
@@ -1258,7 +1254,7 @@ export default function App() {
                     >
                       <div>
                         <div className="flex items-start justify-between gap-4 mb-4">
-                          <img className="w-16 h-16 rounded-xl object-cover border border-white/10" src={creative.avatarUrl} alt={creative.name} referrerPolicy="no-referrer" />
+                          <Avatar src={creative.avatarUrl} name={creative.name} className="w-16 h-16 rounded-xl border border-white/10 text-lg" />
                           <div className="text-right">
                             {creative.hourlyRate > 0 && <span className="font-mono text-base font-bold text-brand-volt block">${creative.hourlyRate}/hr</span>}
                             <span className="text-brand-text-muted text-[10px] font-mono block mt-1">{creative.location}</span>
@@ -2109,7 +2105,7 @@ export default function App() {
               </button>
 
               <div className="flex flex-col md:flex-row items-start gap-6 pb-6 border-b border-white/5 mb-6">
-                <img className="w-24 h-24 rounded-2xl object-cover border border-white/10" src={selectedCreative.avatarUrl} alt={selectedCreative.name} referrerPolicy="no-referrer" />
+                <Avatar src={selectedCreative.avatarUrl} name={selectedCreative.name} className="w-24 h-24 rounded-2xl border border-white/10 text-2xl" />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <h4 className="font-display text-2xl text-white font-bold">{selectedCreative.name}</h4>
@@ -2207,7 +2203,7 @@ export default function App() {
 
               <div className="flex items-center justify-between gap-4 pb-4 border-b border-white/5 mb-6">
                 <div className="flex items-center gap-3">
-                  <img className="w-12 h-12 rounded-xl object-cover border border-white/10" src={selectedQuest.clientAvatar} alt={selectedQuest.clientName} referrerPolicy="no-referrer" />
+                  <Avatar src={selectedQuest.clientAvatar} name={selectedQuest.clientName} className="w-12 h-12 rounded-xl border border-white/10 text-sm" />
                   <div>
                     <h4 className="font-display text-lg text-white font-bold leading-tight">{selectedQuest.title}</h4>
                     <span className="text-[10px] text-brand-text-muted font-mono uppercase tracking-wider">{selectedQuest.clientName}</span>

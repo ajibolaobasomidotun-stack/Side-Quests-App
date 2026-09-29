@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { Application, Quest, UserProfile } from '../types';
-import { Plus, Work, CheckCircle, Close, AccountCircle } from './Icons';
+import { Plus, Work, CheckCircle, Close } from './Icons';
+import { Avatar } from './Avatar';
 
 interface DashboardProps {
   uid: string;
@@ -36,15 +37,6 @@ const Chip: React.FC<{ status: string }> = ({ status }) => (
     {statusLabel[status] || status}
   </span>
 );
-
-const Avatar: React.FC<{ src?: string; name: string }> = ({ src, name }) =>
-  src ? (
-    <img src={src} alt={name} className="w-10 h-10 rounded-lg object-cover border border-white/10" referrerPolicy="no-referrer" />
-  ) : (
-    <span className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
-      <AccountCircle className="w-6 h-6 text-brand-text-muted" />
-    </span>
-  );
 
 export const Dashboard: React.FC<DashboardProps> = (props) => {
   const { uid, profile, quests } = props;
@@ -117,7 +109,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                       <li key={a.id} className="bg-brand-bg/60 border border-white/5 rounded-xl p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3">
-                            <Avatar src={a.applicantAvatar} name={a.applicantName} />
+                            <Avatar src={a.applicantAvatar} name={a.applicantName} className="w-10 h-10 rounded-lg text-sm" />
                             <div>
                               <p className="text-sm text-white font-semibold">{a.applicantName}</p>
                               {a.applicantHeadline && <p className="text-[11px] text-brand-text-muted">{a.applicantHeadline}</p>}

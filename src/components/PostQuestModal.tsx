@@ -61,7 +61,7 @@ export const PostQuestModal: React.FC<PostQuestModalProps> = ({
       id: `quest_${Date.now()}`,
       title: title.trim(),
       clientName: currentUser.organizationName || currentUser.displayName || 'Gig Provider',
-      clientAvatar: currentUser.avatarUrl || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=400&h=400&fit=crop',
+      clientAvatar: currentUser.avatarUrl || '',
       category,
       budget: totalBudget,
       deadline: deadline || 'In 14 Days',

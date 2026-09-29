@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
+import { Avatar } from './Avatar';
 import { UserProfile, Quest, Creative, AccountType } from '../types';
 import { ARTIST_CATEGORIES, PROVIDER_CATEGORIES } from '../profileData';
 import { 
@@ -90,12 +91,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-6 border-b border-white/10">
           <div className="flex items-center gap-4 md:gap-6">
             <div className="relative flex-shrink-0">
-              <img
-                src={profile.avatarUrl}
-                alt={profile.displayName}
-                referrerPolicy="no-referrer"
-                className="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover border-2 border-brand-volt shadow-xl shadow-brand-volt/10"
-              />
+              <Avatar src={profile.avatarUrl} name={profile.displayName} className="w-20 h-20 md:w-24 md:h-24 rounded-2xl border-2 border-brand-volt shadow-xl shadow-brand-volt/10 text-2xl" />
               {profile.verified && (
                 <span className="absolute -bottom-1 -right-1 p-1 bg-brand-bg rounded-lg border border-brand-volt/40" title="Verified by SideQuests">
                   <Verified className="w-4 h-4 text-brand-volt" />
@@ -475,12 +471,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     onClick={() => onSelectCreative(creative)}
                     className="bg-brand-container-low border border-white/10 hover:border-brand-volt/40 p-5 rounded-2xl cursor-pointer transition-all hover:bg-brand-container-high/50 flex items-center gap-4"
                   >
-                    <img
-                      src={creative.avatarUrl}
-                      alt={creative.name}
-                      referrerPolicy="no-referrer"
-                      className="w-14 h-14 rounded-xl object-cover border border-white/10"
-                    />
+                    <Avatar src={creative.avatarUrl} name={creative.name} className="w-14 h-14 rounded-xl border border-white/10 text-base" />
                     <div className="flex-grow">
                       <div className="flex items-center justify-between">
                         <h4 className="text-sm font-bold text-white">{creative.name}</h4>
