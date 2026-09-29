@@ -1,214 +1,295 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { 
-  getAuth, 
-  GoogleAuthProvider, 
-  signInWithPopup, 
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
   signOut as firebaseSignOut,
-  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updateProfile,
   type User as FirebaseUser
 } from "firebase/auth";
-import { 
-  getFirestore, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  collection, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  addDoc, 
-  serverTimestamp,
-  getDocFromServer,
-  where,
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
   deleteDoc,
-  getDocs
+  deleteField,
+  collection,
+  query,
+  where,
+  onSnapshot
 } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
+import type { AccountType, Application, ApplicationStatus, Quest, UserProfile } from "../types";
 
-// Initialize Firebase App
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-
-// Initialize Auth
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
-// Initialize Firestore with specific database ID if configured
-export const db = firebaseConfig.firestoreDatabaseId 
+export const db = firebaseConfig.firestoreDatabaseId
   ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
   : getFirestore(app);
 
-// Test connection on boot as mandated by Firebase integration guidelines
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, "test", "connection"));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("the client is offline")) {
-      console.warn("Firestore client is offline, check connection/network:", error.message);
+/** Firestore rejects `undefined`; drop those keys (shallow + one level of nested objects). */
+function clean<T extends Record<string, any>>(obj: T): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === undefined) continue;
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      out[k] = clean(v);
+    } else {
+      out[k] = v;
     }
   }
+  return out;
 }
-testConnection();
 
-// Authentication Helpers
-export async function signInWithGoogle(): Promise<FirebaseUser | null> {
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    if (result.user) {
-      // Sync basic user info to Firestore user profile document
-      const userDocRef = doc(db, "users", result.user.uid);
-      const snap = await getDoc(userDocRef);
-      if (!snap.exists()) {
-        await setDoc(userDocRef, {
-          id: result.user.uid,
-          name: result.user.displayName || "Creative Artist",
-          email: result.user.email || "",
-          photoURL: result.user.photoURL || "",
-          accountType: "artist",
-          roleHeadline: "Verified Audio & Creative Professional",
-          bio: "Producer, Sound Designer & Creative Engineer active on SideQuests.",
-          skills: ["Mixing & Mastering", "Live Production", "Sound Design"],
-          hourlyRate: "$85 - $150 / hr",
-          verified: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
-      }
-    }
-    return result.user;
-  } catch (error) {
-    console.error("Google Sign-In Error:", error);
-    throw error;
+const nowIso = () => new Date().toISOString();
+
+// ---------------------------------------------------------------------------
+// Authentication
+// ---------------------------------------------------------------------------
+
+export async function signInWithGoogle(): Promise<FirebaseUser> {
+  const result = await signInWithPopup(auth, googleProvider);
+  return result.user;
+}
+
+export async function signUpWithEmail(name: string, email: string, password: string): Promise<FirebaseUser> {
+  const cred = await createUserWithEmailAndPassword(auth, email, password);
+  if (name.trim()) {
+    await updateProfile(cred.user, { displayName: name.trim() });
   }
+  return cred.user;
+}
+
+export async function signInWithEmail(email: string, password: string): Promise<FirebaseUser> {
+  const cred = await signInWithEmailAndPassword(auth, email, password);
+  return cred.user;
+}
+
+export async function resetPassword(email: string): Promise<void> {
+  await sendPasswordResetEmail(auth, email);
 }
 
 export async function signOutUser(): Promise<void> {
   await firebaseSignOut(auth);
 }
 
-// User Profile Persistence Helpers
-export async function syncUserProfile(uid: string, profileData: Record<string, any>) {
-  const userRef = doc(db, "users", uid);
-  await setDoc(userRef, {
-    ...profileData,
+/** Turns Firebase auth error codes into plain-English messages. */
+export function authErrorMessage(err: any): string {
+  const code: string = err?.code || "";
+  switch (code) {
+    case "auth/invalid-email": return "That email address doesn't look right.";
+    case "auth/missing-password": return "Please enter a password.";
+    case "auth/weak-password": return "Password needs at least 6 characters.";
+    case "auth/email-already-in-use": return "An account with this email already exists. Try signing in instead.";
+    case "auth/invalid-credential":
+    case "auth/wrong-password":
+    case "auth/user-not-found": return "Email or password is incorrect.";
+    case "auth/too-many-requests": return "Too many attempts. Please wait a minute and try again.";
+    case "auth/popup-blocked": return "Your browser blocked the sign-in popup. Allow popups for this site and try again.";
+    case "auth/operation-not-allowed": return "This sign-in method isn't enabled yet.";
+    case "auth/unauthorized-domain": return "This web address isn't authorized for sign-in yet.";
+    default: return "Something went wrong. Please try again.";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// User profiles  (collection: users/{uid}; publicly readable, so no email here)
+// ---------------------------------------------------------------------------
+
+/** Maps a Firestore user document (including older AI Studio-era docs) to a UserProfile. */
+export function docToProfile(uid: string, d: Record<string, any>): UserProfile {
+  return {
     id: uid,
-    updatedAt: new Date().toISOString()
-  }, { merge: true });
+    accountType: (d.accountType === "provider" ? "provider" : "artist") as AccountType,
+    displayName: d.displayName || d.name || "SideQuests Member",
+    handle: d.handle || "",
+    roleHeadline: d.roleHeadline || "",
+    bio: d.bio || "",
+    location: d.location || "",
+    avatarUrl: d.avatarUrl || d.photoURL || "",
+    selectedCategories: d.selectedCategories || d.skills || [],
+    hourlyRate: typeof d.hourlyRate === "number" ? d.hourlyRate : undefined,
+    credits: d.credits || [],
+    gear: d.gear || [],
+    experienceLevel: d.experienceLevel,
+    availability: d.availability,
+    portfolioLinks: d.portfolioLinks,
+    organizationName: d.organizationName,
+    orgType: d.orgType,
+    budgetTier: d.budgetTier,
+    hiringGoals: d.hiringGoals || [],
+    verified: d.verified === true,
+    createdAt: d.createdAt || nowIso()
+  };
 }
 
-export async function fetchUserProfile(uid: string) {
-  try {
-    const snap = await getDoc(doc(db, "users", uid));
-    if (snap.exists()) {
-      return snap.data();
-    }
-  } catch (err) {
-    console.warn("Could not fetch user profile from Firestore:", err);
-  }
-  return null;
+export async function fetchUserProfile(uid: string): Promise<UserProfile | null> {
+  const snap = await getDoc(doc(db, "users", uid));
+  return snap.exists() ? docToProfile(uid, snap.data()) : null;
 }
 
-// Quests Persistence Helpers
-export function subscribeQuests(onUpdate: (quests: any[]) => void) {
-  try {
-    const q = query(collection(db, "quests"), orderBy("createdAt", "desc"));
-    return onSnapshot(q, (snapshot) => {
-      const items: any[] = [];
-      snapshot.forEach((docSnap) => {
-        items.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      onUpdate(items);
-    }, (error) => {
-      console.warn("Firestore quest subscription note:", error.message);
-    });
-  } catch (err) {
-    console.warn("Error setting up quests subscription:", err);
-    return () => {};
-  }
-}
-
-export async function createFirestoreQuest(questData: Record<string, any>) {
-  const questCol = collection(db, "quests");
-  const docRef = await addDoc(questCol, {
-    ...questData,
-    createdAt: new Date().toISOString(),
-    status: questData.status || "open"
+/**
+ * Creates or updates the signed-in user's profile.
+ * `verified` is never written from the app — only an admin can set it (enforced in firestore.rules).
+ */
+export async function saveUserProfile(uid: string, profile: UserProfile, isNew: boolean) {
+  const { id: _id, verified: _verified, ...rest } = profile;
+  const payload = clean({
+    ...rest,
+    updatedAt: nowIso(),
+    ...(isNew ? { createdAt: nowIso() } : {})
   });
-  return docRef.id;
+  // Remove legacy fields written by the AI Studio prototype (email must not be public).
+  const legacyCleanup = isNew ? {} : {
+    email: deleteField(), name: deleteField(), photoURL: deleteField(), skills: deleteField()
+  };
+  await setDoc(doc(db, "users", uid), { ...payload, ...legacyCleanup }, { merge: true });
 }
 
-// Applications Persistence Helpers
-export async function submitQuestApplication(applicationData: {
-  questId: string;
-  questTitle: string;
-  applicantUid: string;
-  applicantName: string;
-  applicantAvatar?: string;
-  proposalText: string;
-  bidAmount: string;
-}) {
-  const appsCol = collection(db, "applications");
-  const docRef = await addDoc(appsCol, {
-    ...applicationData,
+export async function updateAccountType(uid: string, accountType: AccountType) {
+  await updateDoc(doc(db, "users", uid), { accountType, updatedAt: nowIso() });
+}
+
+/** Live list of artist profiles for the Creatives directory. */
+export function subscribeArtists(onUpdate: (profiles: UserProfile[]) => void) {
+  const q = query(collection(db, "users"), where("accountType", "==", "artist"));
+  return onSnapshot(q, (snap) => {
+    onUpdate(snap.docs.map((d) => docToProfile(d.id, d.data())));
+  }, (err) => console.warn("Artists subscription:", err.message));
+}
+
+// ---------------------------------------------------------------------------
+// Quests  (collection: quests/{questId})
+// ---------------------------------------------------------------------------
+
+function docToQuest(id: string, d: Record<string, any>): Quest {
+  const budget = typeof d.budget === "number"
+    ? d.budget
+    : parseInt(String(d.budget || "").replace(/[^0-9]/g, ""), 10) || 0;
+  const milestones = Array.isArray(d.milestones) && d.milestones.length > 0
+    ? d.milestones.map((m: any, i: number) => ({
+        id: m.id || `m${i + 1}`,
+        title: m.title || `Milestone ${i + 1}`,
+        amount: Number(m.amount) || 0,
+        status: "escrowed" as const
+      }))
+    : [{ id: "m1", title: "Final delivery", amount: budget, status: "escrowed" as const }];
+  return {
+    id,
+    title: d.title || "Untitled quest",
+    clientUid: d.clientUid,
+    clientName: d.clientName || "SideQuests Studio",
+    clientAvatar: d.clientAvatar || "",
+    category: d.category || "Production",
+    budget,
+    deadline: d.deadline || "Flexible",
+    description: d.description || "",
+    requirements: d.requirements || d.tags || [],
+    milestones,
+    status: d.status || "open",
+    hiredUid: d.hiredUid,
+    createdAt: d.createdAt || ""
+  };
+}
+
+export function subscribeQuests(onUpdate: (quests: Quest[]) => void) {
+  return onSnapshot(collection(db, "quests"), (snap) => {
+    const list = snap.docs.map((d) => docToQuest(d.id, d.data()));
+    list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    onUpdate(list);
+  }, (err) => console.warn("Quests subscription:", err.message));
+}
+
+export async function createQuest(uid: string, owner: UserProfile, quest: Quest): Promise<string> {
+  const ref = doc(collection(db, "quests"));
+  await setDoc(ref, clean({
+    title: quest.title,
+    description: quest.description,
+    category: quest.category,
+    budget: quest.budget,
+    deadline: quest.deadline,
+    requirements: quest.requirements,
+    milestones: quest.milestones.map((m, i) => ({ id: `m${i + 1}`, title: m.title, amount: m.amount })),
+    clientUid: uid,
+    clientName: owner.organizationName || owner.displayName,
+    clientAvatar: owner.avatarUrl || "",
+    status: "open",
+    createdAt: nowIso()
+  }));
+  return ref.id;
+}
+
+export async function setQuestStatus(questId: string, status: Quest["status"], hiredUid?: string) {
+  await updateDoc(doc(db, "quests", questId), clean({ status, hiredUid, updatedAt: nowIso() }));
+}
+
+export async function deleteQuest(questId: string) {
+  await deleteDoc(doc(db, "quests", questId));
+}
+
+// ---------------------------------------------------------------------------
+// Applications  (collection: applications/{questId}_{applicantUid})
+// ---------------------------------------------------------------------------
+
+export async function submitApplication(app: Omit<Application, "id" | "status" | "createdAt">) {
+  const id = `${app.questId}_${app.applicantUid}`;
+  await setDoc(doc(db, "applications", id), clean({
+    ...app,
     status: "pending",
-    createdAt: new Date().toISOString()
-  });
-  return docRef.id;
+    createdAt: nowIso()
+  }));
+  return id;
 }
 
-export function subscribeUserApplications(uid: string, onUpdate: (apps: any[]) => void) {
-  try {
-    const q = query(collection(db, "applications"), where("applicantUid", "==", uid));
-    return onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      onUpdate(list);
-    }, (err) => {
-      console.warn("Firestore applications query note:", err.message);
-    });
-  } catch (err) {
-    console.warn("Error subscribing to applications:", err);
-    return () => {};
-  }
+export async function setApplicationStatus(applicationId: string, status: ApplicationStatus) {
+  await updateDoc(doc(db, "applications", applicationId), { status, updatedAt: nowIso() });
 }
 
-// Bookmarks Persistence Helpers
-export async function toggleFirestoreBookmark(userId: string, questId: string, isCurrentlyBookmarked: boolean) {
-  const bookmarksCol = collection(db, "bookmarks");
+export async function withdrawApplication(applicationId: string) {
+  await deleteDoc(doc(db, "applications", applicationId));
+}
+
+function subscribeApplicationsWhere(field: "applicantUid" | "clientUid", uid: string, onUpdate: (apps: Application[]) => void) {
+  const q = query(collection(db, "applications"), where(field, "==", uid));
+  return onSnapshot(q, (snap) => {
+    const list = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Application, "id">) }));
+    list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    onUpdate(list);
+  }, (err) => console.warn("Applications subscription:", err.message));
+}
+
+/** Applications the signed-in creative has sent. */
+export const subscribeMyApplications = (uid: string, cb: (apps: Application[]) => void) =>
+  subscribeApplicationsWhere("applicantUid", uid, cb);
+
+/** Applications received on quests the signed-in studio owns. */
+export const subscribeReceivedApplications = (uid: string, cb: (apps: Application[]) => void) =>
+  subscribeApplicationsWhere("clientUid", uid, cb);
+
+// ---------------------------------------------------------------------------
+// Bookmarks  (collection: bookmarks/{uid}_{questId})
+// ---------------------------------------------------------------------------
+
+export async function toggleBookmark(userId: string, questId: string, isCurrentlyBookmarked: boolean) {
+  const ref = doc(db, "bookmarks", `${userId}_${questId}`);
   if (isCurrentlyBookmarked) {
-    // Remove
-    const q = query(bookmarksCol, where("userId", "==", userId), where("questId", "==", questId));
-    const snaps = await getDocs(q);
-    const deletePromises: Promise<void>[] = [];
-    snaps.forEach((d) => deletePromises.push(deleteDoc(d.ref)));
-    await Promise.all(deletePromises);
+    await deleteDoc(ref);
   } else {
-    // Add
-    await addDoc(bookmarksCol, {
-      userId,
-      questId,
-      createdAt: new Date().toISOString()
-    });
+    await setDoc(ref, { userId, questId, createdAt: nowIso() });
   }
 }
 
 export function subscribeUserBookmarks(userId: string, onUpdate: (questIds: string[]) => void) {
-  try {
-    const q = query(collection(db, "bookmarks"), where("userId", "==", userId));
-    return onSnapshot(q, (snapshot) => {
-      const ids: string[] = [];
-      snapshot.forEach((d) => {
-        const data = d.data();
-        if (data.questId) ids.push(data.questId);
-      });
-      onUpdate(ids);
-    }, (err) => {
-      console.warn("Firestore bookmarks query note:", err.message);
-    });
-  } catch (err) {
-    console.warn("Error subscribing to bookmarks:", err);
-    return () => {};
-  }
+  const q = query(collection(db, "bookmarks"), where("userId", "==", userId));
+  return onSnapshot(q, (snap) => {
+    onUpdate(snap.docs.map((d) => d.data().questId).filter(Boolean));
+  }, (err) => console.warn("Bookmarks subscription:", err.message));
 }

@@ -23,6 +23,7 @@ export interface Creative {
 export interface Quest {
   id: string;
   title: string;
+  clientUid?: string;
   clientName: string;
   clientAvatar: string;
   category: 'Live Performance' | 'Studio Sessions' | 'Production';
@@ -38,6 +39,25 @@ export interface Quest {
   }[];
   status: 'open' | 'active' | 'completed';
   applied?: boolean;
+  hiredUid?: string;
+  createdAt?: string;
+}
+
+export type ApplicationStatus = 'pending' | 'accepted' | 'declined';
+
+export interface Application {
+  id: string;
+  questId: string;
+  questTitle: string;
+  clientUid: string;
+  applicantUid: string;
+  applicantName: string;
+  applicantAvatar?: string;
+  applicantHeadline?: string;
+  proposalText: string;
+  bidAmount: number;
+  status: ApplicationStatus;
+  createdAt: string;
 }
 
 export interface Task {
@@ -131,7 +151,9 @@ export interface UserProfile {
   verifiedEscrowFunded?: boolean;
   activeQuestsCount?: number;
   hiringGoals?: string[];
-  
+
+  /** Set only by a SideQuests admin, never by the user. */
+  verified?: boolean;
   createdAt: string;
 }
 

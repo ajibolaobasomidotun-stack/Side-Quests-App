@@ -218,39 +218,16 @@ export const PROVIDER_CATEGORIES: CategoryOption[] = [
 ];
 
 export const INITIAL_USER_PROFILE: UserProfile = {
-  id: 'user_default',
+  id: '',
   accountType: 'artist',
-  displayName: 'Devon Thorne',
-  handle: '@devonthorne',
-  roleHeadline: 'Live Music Director & Dolby Atmos Mix Engineer',
-  bio: 'Touring MD and Atmos mix specialist with 8+ years behind the console. Touring with major pop & electronic acts, running fail-safe redundant playback rigs and hybrid synth setups.',
-  location: 'Nashville, TN / Los Angeles, CA',
-  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&h=400&fit=crop',
-  selectedCategories: [
-    'cat_dolby_atmos',
-    'cat_stereo_mix',
-    'cat_music_director',
-    'cat_keys_synth',
-    'cat_playback_eng'
-  ],
-  hourlyRate: 135,
-  credits: [
-    'Music Director - Neon Horizons US Tour (2025)',
-    'Dolby Atmos Mix - Solaris EP (Over 40M Streams)',
-    'Keyboardist & Playback - Live Red Rocks Amphitheatre'
-  ],
-  gear: [
-    'Nord Stage 4 + Sequential Take 5',
-    'iConnectivity PlayAUDIO12 Dual Redundant Rig',
-    'Genelec 8330A 7.1.4 Atmos Setup',
-    'UAD Apollo x16 & Neve 1073 Preamp'
-  ],
-  experienceLevel: 'tour_veteran',
-  availability: 'available',
-  portfolioLinks: {
-    spotify: 'https://open.spotify.com/artist/example',
-    soundcloud: 'https://soundcloud.com/example',
-    instagram: 'https://instagram.com/example'
-  },
-  createdAt: '2026-01-15'
+  displayName: '',
+  handle: '',
+  roleHeadline: '',
+  bio: '',
+  location: '',
+  avatarUrl: '',
+  selectedCategories: [],
+  credits: [],
+  gear: [],
+  createdAt: ''
 };

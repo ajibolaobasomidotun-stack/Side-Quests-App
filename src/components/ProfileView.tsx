@@ -102,9 +102,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 referrerPolicy="no-referrer"
                 className="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover border-2 border-brand-volt shadow-xl shadow-brand-volt/10"
               />
-              <span className="absolute -bottom-1 -right-1 p-1 bg-brand-bg rounded-lg border border-brand-volt/40">
-                <Verified className="w-4 h-4 text-brand-volt" />
-              </span>
+              {profile.verified && (
+                <span className="absolute -bottom-1 -right-1 p-1 bg-brand-bg rounded-lg border border-brand-volt/40" title="Verified by SideQuests">
+                  <Verified className="w-4 h-4 text-brand-volt" />
+                </span>
+              )}
             </div>
 
             <div>
@@ -113,10 +115,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   {profile.displayName}
                 </h2>
                 <span className="px-2.5 py-0.5 rounded-full bg-brand-volt/15 text-brand-volt border border-brand-volt/30 text-xs font-mono font-bold uppercase">
-                  {profile.accountType === 'artist' ? 'Artist / Talent' : 'Gig Provider / Client'}
+                  {profile.accountType === 'artist' ? 'Artist / Talent' : 'Studio / Gig Provider'}
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-white/5 text-brand-text-muted border border-white/10 text-xs font-mono">
-                  Protected Payments ID
+                  {profile.verified ? 'Verified by SideQuests' : 'Verification pending'}
                 </span>
               </div>
               <div className="text-xs text-brand-volt font-mono font-medium">{profile.handle}</div>
@@ -171,14 +173,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-brand-volt/10 border border-brand-volt/30 text-brand-volt text-[11px] font-mono">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-brand-volt" />
-                  Cloud Firestore Synced
+                  Signed in
                 </span>
                 {onGoogleSignOut && (
                   <button 
                     onClick={onGoogleSignOut}
                     className="text-white/60 hover:text-red-400 uppercase text-[9px] underline transition-colors cursor-pointer"
                   >
-                    Disconnect
+                    Sign out
                   </button>
                 )}
               </div>
@@ -193,7 +195,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2c0 2.8.7 5.5 1.9 7.8l3.7-2.9z" />
                   <path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z" />
                 </svg>
-                Sync with Google Account
+                Sign In
               </button>
             ) : null}
           </div>
@@ -207,28 +209,28 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
 
           <div className="bg-brand-container-high/60 border border-white/5 p-3.5 rounded-xl">
-            <div className="text-[10px] font-mono text-brand-text-muted uppercase">Payment Rating</div>
-            <div className="text-lg font-bold text-brand-volt font-mono mt-0.5 flex items-center gap-1">
-              5.0 <Star className="w-4 h-4 text-brand-volt inline" />
+            <div className="text-[10px] font-mono text-brand-text-muted uppercase">Member Since</div>
+            <div className="text-lg font-bold text-white font-mono mt-0.5">
+              {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : '—'}
             </div>
           </div>
 
           <div className="bg-brand-container-high/60 border border-white/5 p-3.5 rounded-xl">
             <div className="text-[10px] font-mono text-brand-text-muted uppercase">
-              {profile.accountType === 'artist' ? 'Verified Credits' : 'Active Open Quests'}
+              {profile.accountType === 'artist' ? 'Listed Credits' : 'Open Quests'}
             </div>
             <div className="text-lg font-bold text-white font-mono mt-0.5">
-              {profile.accountType === 'artist' 
-                ? (profile.credits ? profile.credits.length : 3) 
-                : (profile.hiringGoals ? profile.hiringGoals.length : 2)} Listed
+              {profile.accountType === 'artist'
+                ? (profile.credits?.length || 0)
+                : quests.filter(q => q.clientUid === profile.id && q.status === 'open').length}
             </div>
           </div>
 
           <div className="bg-brand-container-high/60 border border-white/5 p-3.5 rounded-xl">
-            <div className="text-[10px] font-mono text-brand-text-muted uppercase">Security Status</div>
-            <div className="text-xs font-bold text-brand-volt font-mono mt-1 flex items-center gap-1">
+            <div className="text-[10px] font-mono text-brand-text-muted uppercase">Verification</div>
+            <div className={`text-xs font-bold font-mono mt-1 flex items-center gap-1 ${profile.verified ? 'text-brand-volt' : 'text-brand-text-muted'}`}>
               <VerifiedUser className="w-3.5 h-3.5" />
-              100% Payment Protected
+              {profile.verified ? 'Verified' : 'Pending review'}
             </div>
           </div>
         </div>
@@ -314,14 +316,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-white/10">
                 <div>
                   <h3 className="text-xs font-mono uppercase tracking-widest text-brand-text-muted mb-3 font-semibold">
-                    Verified Portfolio Credits
+                    Portfolio Credits
                   </h3>
                   <div className="space-y-2">
-                    {(profile.credits || [
-                      'Music Director - US Arena Tour (2025)',
-                      'Dolby Atmos Mix - Platinum LP',
-                      'Session Keys - Live Festival Broadcast'
-                    ]).map((credit, i) => (
+                    {(profile.credits || []).length === 0 && <p className="text-xs text-brand-text-muted">No credits added yet.</p>}
+                    {(profile.credits || []).map((credit, i) => (
                       <div key={i} className="flex items-center gap-2.5 text-xs text-white/90 bg-brand-container-high/40 p-2.5 rounded-xl border border-white/5">
                         <span className="w-1.5 h-1.5 rounded-full bg-brand-volt flex-shrink-0"></span>
                         <span>{credit}</span>
@@ -335,12 +334,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     Live Rig & Studio Hardware
                   </h3>
                   <div className="flex flex-wrap gap-2">
-                    {(profile.gear || [
-                      'Nord Stage 4',
-                      'iConnectivity PlayAUDIO12 Rig',
-                      'UAD Apollo x8p',
-                      'Genelec 8330A Atmos System'
-                    ]).map((item, i) => (
+                    {(profile.gear || []).length === 0 && <p className="text-xs text-brand-text-muted">No gear added yet.</p>}
+                    {(profile.gear || []).map((item, i) => (
                       <span key={i} className="bg-brand-container-high border border-white/10 px-3 py-1.5 rounded-xl text-xs text-brand-text-muted font-mono">
                         {item}
                       </span>
@@ -357,10 +352,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   Active Gig Openings & Hiring Goals
                 </h3>
                 <div className="space-y-2">
-                  {(profile.hiringGoals || [
-                    'Seeking FOH Engineer for 2026 Tour',
-                    'Looking for Dolby Atmos mix engineers for LP rollout'
-                  ]).map((goal, i) => (
+                  {(profile.hiringGoals || []).length === 0 && <p className="text-xs text-brand-text-muted">No hiring goals added yet.</p>}
+                  {(profile.hiringGoals || []).map((goal, i) => (
                     <div key={i} className="flex items-center gap-2.5 text-xs text-white/90 bg-brand-container-high/40 p-3 rounded-xl border border-white/5">
                       <span className="w-1.5 h-1.5 rounded-full bg-brand-volt flex-shrink-0"></span>
                       <span>{goal}</span>

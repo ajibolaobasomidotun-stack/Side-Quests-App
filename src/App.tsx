@@ -50,31 +50,46 @@ import {
 } from './components/Icons'; // Using simple fallback SVGs or Lucide/material-styled custom icons for ultimate reliability
 
 import { motion, AnimatePresence } from 'motion/react';
-import { Creative, Quest, Task, Article, UserProfile, AccountType } from './types';
-import { INITIAL_CREATIVES, INITIAL_QUESTS, INITIAL_TASKS, LEARN_ARTICLES } from './data';
+import { Creative, Quest, Task, Article, UserProfile, AccountType, Application } from './types';
+import { LEARN_ARTICLES } from './data';
 import { INITIAL_USER_PROFILE, ARTIST_CATEGORIES, PROVIDER_CATEGORIES } from './profileData';
 import { ProfileCreator } from './components/ProfileCreator';
 import { ProfileView } from './components/ProfileView';
 import { PostQuestModal } from './components/PostQuestModal';
-import { 
-  auth, 
-  signInWithGoogle, 
-  signOutUser, 
-  syncUserProfile, 
+import { AuthModal } from './components/AuthModal';
+import { ApplyModal } from './components/ApplyModal';
+import { Dashboard } from './components/Dashboard';
+import {
+  auth,
+  signOutUser,
   fetchUserProfile,
-  createFirestoreQuest,
+  saveUserProfile,
+  updateAccountType,
+  subscribeArtists,
+  createQuest,
   subscribeQuests,
-  submitQuestApplication,
-  toggleFirestoreBookmark,
+  setQuestStatus,
+  submitApplication,
+  setApplicationStatus,
+  withdrawApplication,
+  subscribeMyApplications,
+  subscribeReceivedApplications,
+  toggleBookmark,
   subscribeUserBookmarks
 } from './lib/firebase';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'quests' | 'creatives' | 'learn' | 'pricing' | 'tasks' | 'profile'>('quests');
-  const [quests, setQuests] = useState<Quest[]>(INITIAL_QUESTS);
-  const [creatives, setCreatives] = useState<Creative[]>(INITIAL_CREATIVES);
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
+  const [quests, setQuests] = useState<Quest[]>([]);
+  const [artistProfiles, setArtistProfiles] = useState<UserProfile[]>([]);
+  // Contracts (OS Console) arrive with Protected Payments; nothing is simulated in the meantime.
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [myApplications, setMyApplications] = useState<Application[]>([]);
+  const [receivedApplications, setReceivedApplications] = useState<Application[]>([]);
+  const [hasProfile, setHasProfile] = useState<boolean>(false);
+  const [authModal, setAuthModal] = useState<{ open: boolean; mode: 'signin' | 'signup' }>({ open: false, mode: 'signin' });
+  const [applyingQuest, setApplyingQuest] = useState<Quest | null>(null);
   
   // Firebase Auth & Cloud Firestore state
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
@@ -83,17 +98,7 @@ export default function App() {
   const [serverStatus, setServerStatus] = useState<{ status: string } | null>(null);
 
   // User Profile state
-  const [userProfile, setUserProfile] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('sidequests_user_profile');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        // fallback
-      }
-    }
-    return INITIAL_USER_PROFILE;
-  });
+  const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_USER_PROFILE);
   const [isEditingProfile, setIsEditingProfile] = useState<boolean>(false);
   const [isPostQuestModalOpen, setIsPostQuestModalOpen] = useState<boolean>(false);
   
@@ -161,76 +166,94 @@ export default function App() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      setIsAuthLoading(false);
-      if (user) {
-        try {
-          const remoteProfile = await fetchUserProfile(user.uid);
-          if (remoteProfile) {
-            setUserProfile(prev => ({
-              ...prev,
-              ...remoteProfile,
-              id: user.uid,
-              displayName: remoteProfile.name || remoteProfile.displayName || user.displayName || prev.displayName,
-              avatarUrl: remoteProfile.photoURL || user.photoURL || prev.avatarUrl,
-            }));
-          } else {
-            // First-time sync with Google account info
-            const initialSyncProfile: UserProfile = {
-              ...userProfile,
-              id: user.uid,
-              displayName: user.displayName || userProfile.displayName,
-              avatarUrl: user.photoURL || userProfile.avatarUrl,
-            };
-            setUserProfile(initialSyncProfile);
-            await syncUserProfile(user.uid, {
-              name: initialSyncProfile.displayName,
-              email: user.email || '',
-              photoURL: initialSyncProfile.avatarUrl,
-              accountType: initialSyncProfile.accountType,
-              roleHeadline: initialSyncProfile.roleHeadline,
-              bio: initialSyncProfile.bio,
-              hourlyRate: initialSyncProfile.hourlyRate || 120,
-              verified: true,
-              skills: initialSyncProfile.selectedCategories
-            });
-          }
-        } catch (e) {
-          console.warn("Firestore profile sync error:", e);
+      if (!user) {
+        setHasProfile(false);
+        setUserProfile(INITIAL_USER_PROFILE);
+        setIsAuthLoading(false);
+        return;
+      }
+      try {
+        const remoteProfile = await fetchUserProfile(user.uid);
+        if (remoteProfile) {
+          setUserProfile(remoteProfile);
+          setHasProfile(true);
+        } else {
+          // New account: send them through profile setup, where they choose Artist or Studio.
+          setHasProfile(false);
+          setUserProfile(prev => ({
+            ...INITIAL_USER_PROFILE,
+            id: user.uid,
+            accountType: prev.accountType,
+            displayName: user.displayName || '',
+            avatarUrl: user.photoURL || '',
+            createdAt: new Date().toISOString()
+          }));
+          setIsEditingProfile(true);
+          setActiveTab('profile');
         }
+      } catch (e) {
+        console.warn('Could not load profile:', e);
+      } finally {
+        setIsAuthLoading(false);
       }
     });
     return () => unsub();
   }, []);
 
-  // Real-time Cloud Firestore Quests Subscription
+  // Live quests from Firestore
   useEffect(() => {
-    const unsubQuests = subscribeQuests((remoteQuests) => {
-      if (remoteQuests && remoteQuests.length > 0) {
-        setQuests(prev => {
-          const remoteIds = new Set(remoteQuests.map(q => q.id));
-          const existingFiltered = prev.filter(q => !remoteIds.has(q.id));
-          const mappedRemote: Quest[] = remoteQuests.map(rq => ({
-            id: rq.id,
-            title: rq.title,
-            clientName: rq.clientName || 'Verified Producer',
-            clientAvatar: rq.clientAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-            category: rq.category || 'Production',
-            budget: typeof rq.budget === 'number' ? rq.budget : parseInt(String(rq.budget).replace(/[^0-9]/g, '')) || 2500,
-            deadline: rq.deadline || 'Flexible',
-            description: rq.description || 'Payment-protected gig opportunity.',
-            requirements: rq.tags || ['Protected Payments', 'Direct Payout'],
-            milestones: [
-              { id: 'm1', title: 'Phase 1 - Delivery & Review', amount: Math.round((typeof rq.budget === 'number' ? rq.budget : 2500) * 0.5), status: 'escrowed' },
-              { id: 'm2', title: 'Phase 2 - Final Sign-off', amount: Math.round((typeof rq.budget === 'number' ? rq.budget : 2500) * 0.5), status: 'escrowed' }
-            ],
-            status: rq.status || 'open'
-          }));
-          return [...mappedRemote, ...existingFiltered];
-        });
-      }
-    });
-    return () => unsubQuests();
+    const unsub = subscribeQuests(setQuests);
+    return () => unsub();
   }, []);
+
+  // Live artist directory from Firestore
+  useEffect(() => {
+    const unsub = subscribeArtists(setArtistProfiles);
+    return () => unsub();
+  }, []);
+
+  // Applications: sent (creatives) and received (studios)
+  useEffect(() => {
+    if (!currentUser) {
+      setMyApplications([]);
+      setReceivedApplications([]);
+      return;
+    }
+    const unsubMine = subscribeMyApplications(currentUser.uid, setMyApplications);
+    const unsubReceived = subscribeReceivedApplications(currentUser.uid, setReceivedApplications);
+    return () => { unsubMine(); unsubReceived(); };
+  }, [currentUser]);
+
+  const appliedQuestIds = new Set(myApplications.map(a => a.questId));
+  const openQuests: Quest[] = quests
+    .filter(q => q.status === 'open')
+    .map(q => ({ ...q, applied: appliedQuestIds.has(q.id) }));
+
+  const creatives: Creative[] = artistProfiles
+    .filter(p => p.displayName && p.id !== undefined)
+    .map((p): Creative => {
+      const cats = p.selectedCategories || [];
+      const has = (...keys: string[]) => cats.some(c => keys.some(k => c.includes(k)));
+      return {
+        id: p.id,
+        name: p.displayName,
+        role: has('music_director', '_md') ? 'md'
+          : has('atmos', 'mix', 'master', 'eng', 'tuning', 'foh') ? 'engineer'
+          : has('prod', 'beat', 'hiphop', 'pop', 'electronic', 'compos', 'score') ? 'producer'
+          : 'musician',
+        roleLabel: p.roleHeadline || 'Creative',
+        avatarUrl: p.avatarUrl || 'https://ui-avatars.com/api/?background=1a1a1a&color=c3f400&name=' + encodeURIComponent(p.displayName),
+        bio: p.bio || '',
+        verified: p.verified === true,
+        rating: 0,
+        tags: cats.map(catId => ARTIST_CATEGORIES.find(x => x.id === catId)?.name || catId).slice(0, 4),
+        credits: p.credits || [],
+        gear: p.gear || [],
+        hourlyRate: p.hourlyRate || 0,
+        location: p.location || '',
+        verifiedCreditsCount: p.verified ? (p.credits?.length || 0) : 0
+      };
+    });
 
   // Real-time Cloud Firestore Bookmarks Subscription
   useEffect(() => {
@@ -244,22 +267,14 @@ export default function App() {
     return () => unsub();
   }, [currentUser]);
 
-  const handleGoogleSignIn = async () => {
-    try {
-      const user = await signInWithGoogle();
-      if (user) {
-        showToast(`Connected as ${user.displayName || user.email}! Cloud sync enabled.`, 'success');
-      }
-    } catch (err: any) {
-      if (err?.code !== 'auth/popup-closed-by-user') {
-        showToast('Authentication failed. Please try again.', 'error');
-      }
-    }
-  };
+  const openAuth = (mode: 'signin' | 'signup' = 'signin') => setAuthModal({ open: true, mode });
+  // Kept under the old name: every "Sign in" button in the UI calls this.
+  const handleGoogleSignIn = () => openAuth('signin');
 
   const handleGoogleSignOut = async () => {
     try {
       await signOutUser();
+      setActiveTab('quests');
       showToast('Signed out of SideQuests.', 'info');
     } catch (err) {
       showToast('Could not sign out.', 'error');
@@ -267,214 +282,162 @@ export default function App() {
   };
 
   const handleToggleBookmark = async (questId: string) => {
-    const isBookmarked = userBookmarks.includes(questId);
     if (!currentUser) {
-      setUserBookmarks(prev => isBookmarked ? prev.filter(id => id !== questId) : [...prev, questId]);
-      showToast(isBookmarked ? 'Quest removed from saved list.' : 'Quest saved locally. Sign in to sync across devices!', 'info');
+      showToast('Sign in to save quests.', 'info');
+      openAuth('signin');
       return;
     }
+    const isBookmarked = userBookmarks.includes(questId);
     try {
-      await toggleFirestoreBookmark(currentUser.uid, questId, isBookmarked);
-      showToast(isBookmarked ? 'Removed from saved quests.' : 'Quest saved to Firestore bookmarks!', 'success');
+      await toggleBookmark(currentUser.uid, questId, isBookmarked);
+      showToast(isBookmarked ? 'Removed from saved quests.' : 'Quest saved.', 'success');
     } catch (err) {
-      console.warn("Bookmark toggle note:", err);
+      console.warn('Bookmark toggle failed:', err);
+      showToast('Could not update saved quests.', 'error');
     }
   };
 
   const handleSaveUserProfile = async (savedProfile: UserProfile) => {
-    setUserProfile(savedProfile);
+    if (!currentUser) {
+      showToast('Sign in to save your profile.', 'info');
+      openAuth('signup');
+      return;
+    }
+    const profileToSave: UserProfile = { ...savedProfile, id: currentUser.uid, verified: userProfile.verified };
     try {
-      localStorage.setItem('sidequests_user_profile', JSON.stringify(savedProfile));
-    } catch (e) {
-      console.error(e);
+      await saveUserProfile(currentUser.uid, profileToSave, !hasProfile);
+      setUserProfile(profileToSave);
+      setHasProfile(true);
+      setIsEditingProfile(false);
+      showToast('Profile saved!', 'success');
+    } catch (err) {
+      console.warn('Could not save profile:', err);
+      showToast('Could not save your profile. Please try again.', 'error');
     }
-
-    // Persist to Cloud Firestore if user is authenticated
-    if (currentUser) {
-      try {
-        await syncUserProfile(currentUser.uid, {
-          name: savedProfile.displayName,
-          accountType: savedProfile.accountType,
-          roleHeadline: savedProfile.roleHeadline,
-          bio: savedProfile.bio,
-          hourlyRate: savedProfile.hourlyRate,
-          photoURL: savedProfile.avatarUrl,
-          skills: savedProfile.selectedCategories,
-          credits: savedProfile.credits,
-          gear: savedProfile.gear,
-          verified: true
-        });
-      } catch (err) {
-        console.warn('Could not sync profile to Firestore:', err);
-      }
-    }
-    
-    // If saving as artist, dynamically update/add to creatives collective
-    if (savedProfile.accountType === 'artist') {
-      const existingIdx = creatives.findIndex(c => c.id === savedProfile.id || c.name.includes('(You)'));
-      const artistCreative: Creative = {
-        id: savedProfile.id,
-        name: `${savedProfile.displayName} (You)`,
-        role: savedProfile.selectedCategories.some(c => c.includes('md') || c.includes('music_director')) ? 'md' :
-              savedProfile.selectedCategories.some(c => c.includes('engineer') || c.includes('atmos') || c.includes('stereo')) ? 'engineer' :
-              savedProfile.selectedCategories.some(c => c.includes('prod') || c.includes('beat') || c.includes('electronic')) ? 'producer' : 'musician',
-        roleLabel: savedProfile.roleHeadline,
-        avatarUrl: savedProfile.avatarUrl,
-        bio: savedProfile.bio,
-        verified: true,
-        rating: 5.0,
-        tags: savedProfile.selectedCategories.map(catId => {
-          const c = ARTIST_CATEGORIES.find(x => x.id === catId);
-          return c ? c.name : catId;
-        }).slice(0, 4),
-        credits: savedProfile.credits && savedProfile.credits.length > 0 ? savedProfile.credits : ['SideQuests Verified Artist Profile'],
-        gear: savedProfile.gear && savedProfile.gear.length > 0 ? savedProfile.gear : ['Apollo x8p', 'Custom Rig'],
-        hourlyRate: savedProfile.hourlyRate || 120,
-        location: savedProfile.location,
-        verifiedCreditsCount: (savedProfile.credits?.length || 0) + 12
-      };
-      
-      if (existingIdx >= 0) {
-        setCreatives(prev => {
-          const next = [...prev];
-          next[existingIdx] = artistCreative;
-          return next;
-        });
-      } else {
-        setCreatives(prev => [artistCreative, ...prev]);
-      }
-    }
-
-    setIsEditingProfile(false);
-    showToast(
-      `Profile saved${currentUser ? ' and synced to Cloud Firestore' : ''} with ${savedProfile.selectedCategories.length} categories!`,
-      'success'
-    );
   };
 
   const handleStartCreateProfile = (type: AccountType = 'artist') => {
-    setUserProfile(prev => ({
-      ...prev,
-      accountType: type
-    }));
+    setUserProfile(prev => ({ ...prev, accountType: type }));
+    if (!currentUser) {
+      openAuth('signup');
+      return;
+    }
     setIsEditingProfile(true);
     setActiveTab('profile');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSwitchProfileType = (newType: AccountType) => {
-    setUserProfile(prev => {
-      const updated: UserProfile = {
-        ...prev,
-        accountType: newType,
-        selectedCategories: newType === 'artist' 
-          ? ['prod_electronic', 'eng_stereo_mix', 'mus_synth_keys'] 
-          : ['gp_tour_live', 'gp_label_ep']
-      };
-      try {
-        localStorage.setItem('sidequests_user_profile', JSON.stringify(updated));
-      } catch (e) {}
-      return updated;
-    });
-    showToast(`Account view switched to ${newType === 'artist' ? 'Artist Talent' : 'Gig Provider'}!`, 'info');
+  const handleSwitchProfileType = async (newType: AccountType) => {
+    if (!currentUser || !hasProfile) return;
+    try {
+      await updateAccountType(currentUser.uid, newType);
+      setUserProfile(prev => ({ ...prev, accountType: newType }));
+      showToast(`Switched to ${newType === 'artist' ? 'Artist' : 'Studio / Gig Provider'} account.`, 'info');
+    } catch (err) {
+      showToast('Could not switch account type.', 'error');
+    }
+  };
+
+  const openPostQuest = () => {
+    if (!currentUser) { openAuth('signup'); return; }
+    if (!hasProfile) { handleStartCreateProfile('provider'); return; }
+    if (userProfile.accountType !== 'provider') {
+      showToast('Switch to a Studio / Gig Provider account (Profile tab) to post quests.', 'info');
+      return;
+    }
+    setIsPostQuestModalOpen(true);
   };
 
   const handleAddNewQuest = async (newQuest: Quest) => {
-    setQuests(prev => [newQuest, ...prev]);
-    showToast(`Quest "${newQuest.title}" posted to the SideQuests network! Protected Payments ready.`, 'success');
-
-    // Persist quest to Firestore
-    if (currentUser) {
-      try {
-        await createFirestoreQuest({
-          title: newQuest.title,
-          description: newQuest.description,
-          budget: `$${newQuest.budget.toLocaleString()}`,
-          clientName: userProfile.displayName,
-          clientUid: currentUser.uid,
-          deadline: newQuest.deadline,
-          category: newQuest.category,
-          status: 'open',
-          escrowProtected: true,
-          tags: newQuest.requirements
-        });
-      } catch (err) {
-        console.warn("Could not sync quest to Firestore:", err);
-      }
+    if (!currentUser) return;
+    try {
+      await createQuest(currentUser.uid, userProfile, newQuest);
+      showToast(`Quest "${newQuest.title}" is live!`, 'success');
+    } catch (err) {
+      console.warn('Could not post quest:', err);
+      showToast('Could not post your quest. Check the details and try again.', 'error');
     }
   };
 
-  const handleApplyQuest = async (quest: Quest) => {
-    // Check if already applied
-    if (quest.applied) {
-      showToast('You have already applied to this gig!', 'info');
+  const handleApplyQuest = (quest: Quest) => {
+    if (!currentUser) {
+      showToast('Sign in or create an account to apply.', 'info');
+      openAuth('signup');
       return;
     }
-
-    // Set quest as applied
-    setQuests(prev => prev.map(q => q.id === quest.id ? { ...q, applied: true } : q));
-
-    // Persist application to Firestore
-    if (currentUser) {
-      try {
-        await submitQuestApplication({
-          questId: quest.id,
-          questTitle: quest.title,
-          applicantUid: currentUser.uid,
-          applicantName: userProfile.displayName,
-          applicantAvatar: userProfile.avatarUrl,
-          proposalText: `Verified creative application for "${quest.title}". All deliverables will be covered by Protected Payments milestones.`,
-          bidAmount: `$${quest.budget.toLocaleString()}`
-        });
-      } catch (err) {
-        console.warn("Firestore application submission note:", err);
-      }
+    if (!hasProfile) {
+      handleStartCreateProfile('artist');
+      return;
     }
+    if (quest.clientUid === currentUser.uid) {
+      showToast('This is your own quest.', 'info');
+      return;
+    }
+    if (userProfile.accountType !== 'artist') {
+      showToast('Switch to an Artist account (Profile tab) to apply to quests.', 'info');
+      return;
+    }
+    if (appliedQuestIds.has(quest.id)) {
+      showToast('You have already applied to this quest.', 'info');
+      return;
+    }
+    setApplyingQuest(quest);
+  };
 
-    // Create a new task (active contract) for the user as the Artist
-    const newTask: Task = {
-      id: `task_${Date.now()}`,
+  const handleSubmitApplication = async (quest: Quest, proposalText: string, bidAmount: number) => {
+    if (!currentUser || !quest.clientUid) throw new Error('Not ready');
+    await submitApplication({
       questId: quest.id,
       questTitle: quest.title,
-      clientName: quest.clientName,
-      artistName: 'Elena Rostova (You)', // Mock user
-      category: quest.category,
-      totalBudget: quest.budget,
-      escrowBalance: quest.budget,
-      releasedAmount: 0,
-      status: 'active',
-      role: 'artist',
-      currentMilestoneIndex: 0,
-      milestones: quest.milestones.map(m => ({
-        id: m.id,
-        title: m.title,
-        amount: m.amount,
-        status: 'escrowed'
-      })),
-      messages: [
-        {
-          id: `msg_${Date.now()}_1`,
-          sender: 'client',
-          text: `Hi Elena! Thanks for applying to "${quest.title}". We’ve approved your application and fully funded the Protected Payment of $${quest.budget.toLocaleString()}. Welcome aboard!`,
-          time: 'Just now'
-        },
-        {
-          id: `msg_${Date.now()}_2`,
-          sender: 'client',
-          text: 'Please review the milestones and let us know when you begin working on the first phase.',
-          time: 'Just now'
-        }
-      ],
-      files: []
-    };
+      clientUid: quest.clientUid,
+      applicantUid: currentUser.uid,
+      applicantName: userProfile.displayName,
+      applicantAvatar: userProfile.avatarUrl,
+      applicantHeadline: userProfile.roleHeadline,
+      proposalText,
+      bidAmount
+    });
+    showToast('Application sent! Track it in the OS Console.', 'success');
+  };
 
-    setTasks(prev => [newTask, ...prev]);
-    setActiveTaskId(newTask.id);
-    setTaskViewRole('artist');
-    showToast(`Application submitted! $${quest.budget.toLocaleString()} secured with Protected Payments!`, 'success');
-    
-    // Smooth transition to Tasks tab
-    setActiveTab('tasks');
+  const handleAcceptApplication = async (app: Application) => {
+    try {
+      await setApplicationStatus(app.id, 'accepted');
+      await setQuestStatus(app.questId, 'active', app.applicantUid);
+      showToast(`You hired ${app.applicantName}!`, 'success');
+    } catch (err) {
+      console.warn(err);
+      showToast('Could not complete the hire. Please try again.', 'error');
+    }
+  };
+
+  const handleDeclineApplication = async (app: Application) => {
+    try {
+      await setApplicationStatus(app.id, 'declined');
+    } catch (err) {
+      showToast('Could not decline the application.', 'error');
+    }
+  };
+
+  const handleWithdrawApplication = async (app: Application) => {
+    try {
+      await withdrawApplication(app.id);
+      showToast('Application withdrawn.', 'info');
+    } catch (err) {
+      showToast('Could not withdraw the application.', 'error');
+    }
+  };
+
+  const handleSetQuestStatus = async (quest: Quest, status: Quest['status']) => {
+    try {
+      await setQuestStatus(quest.id, status);
+    } catch (err) {
+      showToast('Could not update the quest.', 'error');
+    }
+  };
+
+  const handleDirectHire = (_creative: Creative) => {
+    showToast('Direct hiring arrives with Protected Payments. For now, post a quest and they can apply.', 'info');
   };
 
   const handleCreateCustomHire = (e: React.FormEvent) => {
@@ -806,7 +769,7 @@ export default function App() {
                 <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2c0 2.8.7 5.5 1.9 7.8l3.7-2.9z" />
                 <path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z" />
               </svg>
-              <span className="hidden sm:inline">Sign In with Google</span>
+              <span className="hidden sm:inline">Sign In / Sign Up</span>
               <span className="sm:hidden">Sign In</span>
             </button>
           )}
@@ -862,16 +825,10 @@ export default function App() {
                     </button>
                     {!currentUser ? (
                       <button 
-                        onClick={handleGoogleSignIn}
+                        onClick={() => openAuth('signup')}
                         className="border border-white/30 bg-white/10 text-white font-sans font-semibold text-sm px-6 py-3.5 rounded-xl hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-sm"
                       >
-                        <svg className="w-4 h-4" viewBox="0 0 24 24">
-                          <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z" />
-                          <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
-                          <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2c0 2.8.7 5.5 1.9 7.8l3.7-2.9z" />
-                          <path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z" />
-                        </svg>
-                        Connect with Google
+                        Sign Up Free
                       </button>
                     ) : (
                       <button 
@@ -934,13 +891,10 @@ export default function App() {
                         Your professional reputation is your greatest asset. We aggregate engineering credits, album certifications, and verified client testimonials into a singular high-editorial profile.
                       </p>
                       <button 
-                        onClick={() => {
-                          const marcus = creatives.find(c => c.id === 'c1');
-                          if (marcus) setSelectedCreative(marcus);
-                        }}
+                        onClick={() => setActiveTab('creatives')}
                         className="text-brand-volt font-sans font-semibold text-xs flex items-center gap-1.5 hover:gap-3 transition-all uppercase tracking-wider"
                       >
-                        View Example Profile 
+                        Browse Creatives 
                         <ArrowRightAlt className="w-4 h-4 text-brand-volt" />
                       </button>
                     </div>
@@ -1095,7 +1049,7 @@ export default function App() {
                 <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
                     <h3 className="font-display text-3xl text-white font-semibold">Active Quests</h3>
-                    <p className="text-brand-text-muted text-sm mt-1">Funded, payment-protected gigs accepting applications</p>
+                    <p className="text-brand-text-muted text-sm mt-1">Open quests accepting applications</p>
                   </div>
                   
                   {/* Category filters */}
@@ -1132,7 +1086,14 @@ export default function App() {
 
                 {/* Grid of Quests */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {quests
+                  {openQuests.length === 0 && (
+                    <div className="md:col-span-2 bg-brand-container border border-white/5 rounded-2xl p-10 text-center">
+                      <p className="text-sm text-white font-semibold mb-1">No open quests right now</p>
+                      <p className="text-xs text-brand-text-muted mb-4">Studios: be the first to post one.</p>
+                      <button onClick={openPostQuest} className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-5 py-2.5 rounded-xl">Post a Quest</button>
+                    </div>
+                  )}
+                  {openQuests
                     .filter(q => questCategoryFilter === 'All' || q.category === questCategoryFilter)
                     .filter(q => q.title.toLowerCase().includes(questSearch.toLowerCase()) || q.description.toLowerCase().includes(questSearch.toLowerCase()))
                     .map((quest) => (
@@ -1296,7 +1257,7 @@ export default function App() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-10">
               <div className="mb-10">
                 <h3 className="font-display text-3xl md:text-4xl text-white font-semibold">The Artist Collective</h3>
-                <p className="text-brand-text-muted text-sm mt-1">Direct contact directory of premium, thoroughly vetted audio elite</p>
+                <p className="text-brand-text-muted text-sm mt-1">Creatives on SideQuests. A check mark means SideQuests has verified the profile.</p>
               </div>
 
               {/* Filters & Search */}
@@ -1338,6 +1299,13 @@ export default function App() {
               </div>
 
               {/* Grid of Creatives */}
+              {creatives.length === 0 && (
+                <div className="bg-brand-container border border-white/5 rounded-2xl p-10 text-center mb-6">
+                  <p className="text-sm text-white font-semibold mb-1">No creatives have joined yet</p>
+                  <p className="text-xs text-brand-text-muted mb-4">Artists: create your profile to be listed here.</p>
+                  <button onClick={() => handleStartCreateProfile('artist')} className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-5 py-2.5 rounded-xl">Create Artist Profile</button>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {creatives
                   .filter(c => creativeRoleFilter === 'All' || c.role === creativeRoleFilter)
@@ -1356,7 +1324,7 @@ export default function App() {
                         <div className="flex items-start justify-between gap-4 mb-4">
                           <img className="w-16 h-16 rounded-xl object-cover border border-white/10" src={creative.avatarUrl} alt={creative.name} referrerPolicy="no-referrer" />
                           <div className="text-right">
-                            <span className="font-mono text-base font-bold text-brand-volt block">${creative.hourlyRate}/hr</span>
+                            {creative.hourlyRate > 0 && <span className="font-mono text-base font-bold text-brand-volt block">${creative.hourlyRate}/hr</span>}
                             <span className="text-brand-text-muted text-[10px] font-mono block mt-1">{creative.location}</span>
                           </div>
                         </div>
@@ -1386,10 +1354,7 @@ export default function App() {
                           Portfolio & Gear
                         </button>
                         <button 
-                          onClick={() => {
-                            setHiringCreative(creative);
-                            setHireBudget('1500');
-                          }}
+                          onClick={() => handleDirectHire(creative)}
                           className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-4 py-2.5 rounded-lg hover:scale-[1.03] active:scale-95 transition-all"
                         >
                           Hire & Fund
@@ -1634,44 +1599,48 @@ export default function App() {
                     <TaskAlt className="w-7 h-7 text-brand-volt" />
                     OS Console
                   </h3>
-                  <p className="text-brand-text-muted text-xs mt-1">Active trust contracts, live file sync, and milestones release authorization</p>
+                  <p className="text-brand-text-muted text-xs mt-1">Your quests, applications and hires</p>
                 </div>
                 
-                {/* Role Switcher */}
+                {/* Role Switcher (contracts arrive with Protected Payments) */}
+                {tasks.length > 0 && (
                 <div className="flex bg-brand-container border border-white/10 p-1 rounded-xl w-fit">
-                  <button 
-                    onClick={() => {
-                      setTaskViewRole('artist');
-                      // Auto pick first artist task if present
-                      const artistT = tasks.find(t => t.role === 'artist');
-                      if (artistT) setActiveTaskId(artistT.id);
-                    }}
-                    className={`px-4 py-1.5 rounded-lg font-sans text-xs font-semibold uppercase tracking-wider transition-all ${
-                      taskViewRole === 'artist' 
-                        ? 'bg-brand-volt text-brand-bg font-bold' 
-                        : 'text-brand-text-muted hover:text-white'
-                    }`}
-                  >
-                    My Gigs (Artist)
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setTaskViewRole('client');
-                      // Auto pick first client task if present
-                      const clientT = tasks.find(t => t.role === 'client');
-                      if (clientT) setActiveTaskId(clientT.id);
-                    }}
-                    className={`px-4 py-1.5 rounded-lg font-sans text-xs font-semibold uppercase tracking-wider transition-all ${
-                      taskViewRole === 'client' 
-                        ? 'bg-brand-volt text-brand-bg font-bold' 
-                        : 'text-brand-text-muted hover:text-white'
-                    }`}
-                  >
-                    My Hires (Client)
-                  </button>
+                  <button onClick={() => setTaskViewRole('artist')} className={`px-4 py-1.5 rounded-lg font-sans text-xs font-semibold uppercase tracking-wider transition-all ${taskViewRole === 'artist' ? 'bg-brand-volt text-brand-bg font-bold' : 'text-brand-text-muted hover:text-white'}`}>My Gigs (Artist)</button>
+                  <button onClick={() => setTaskViewRole('client')} className={`px-4 py-1.5 rounded-lg font-sans text-xs font-semibold uppercase tracking-wider transition-all ${taskViewRole === 'client' ? 'bg-brand-volt text-brand-bg font-bold' : 'text-brand-text-muted hover:text-white'}`}>My Hires (Client)</button>
                 </div>
+                )}
               </div>
 
+              <div className="mb-10">
+                {!currentUser ? (
+                  <div className="bg-brand-container border border-white/5 rounded-2xl p-10 text-center">
+                    <p className="text-sm text-white font-semibold mb-1">Sign in to see your quests and applications</p>
+                    <button onClick={() => openAuth('signin')} className="mt-3 bg-brand-volt text-brand-bg font-sans font-bold text-xs px-5 py-2.5 rounded-xl">Sign In</button>
+                  </div>
+                ) : !hasProfile ? (
+                  <div className="bg-brand-container border border-white/5 rounded-2xl p-10 text-center">
+                    <p className="text-sm text-white font-semibold mb-1">Finish setting up your profile first</p>
+                    <button onClick={() => { setActiveTab('profile'); setIsEditingProfile(true); }} className="mt-3 bg-brand-volt text-brand-bg font-sans font-bold text-xs px-5 py-2.5 rounded-xl">Set Up Profile</button>
+                  </div>
+                ) : (
+                  <Dashboard
+                    uid={currentUser.uid}
+                    profile={userProfile}
+                    quests={quests}
+                    myApplications={myApplications}
+                    receivedApplications={receivedApplications}
+                    onPostQuest={openPostQuest}
+                    onBrowseQuests={scrollToQuests}
+                    onViewQuest={(q) => setSelectedQuest(q)}
+                    onAccept={handleAcceptApplication}
+                    onDecline={handleDeclineApplication}
+                    onWithdraw={handleWithdrawApplication}
+                    onSetQuestStatus={handleSetQuestStatus}
+                  />
+                )}
+              </div>
+
+              {tasks.length > 0 && (<>
               {/* Split layout: sidebar tasks list + active workspace */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                 
@@ -1980,6 +1949,7 @@ export default function App() {
                 )}
 
               </div>
+              </>)}
 
             </motion.div>
           )}
@@ -1987,11 +1957,22 @@ export default function App() {
           {/* PROFILE VIEW & CREATOR ROUTE */}
           {activeTab === 'profile' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-6">
-              {isEditingProfile ? (
+              {isAuthLoading ? (
+                <p className="text-center text-sm text-brand-text-muted py-20">Loading…</p>
+              ) : !currentUser ? (
+                <div className="max-w-md mx-auto bg-brand-container border border-white/10 rounded-3xl p-8 text-center my-10">
+                  <h3 className="font-display text-2xl text-white font-bold mb-2">Your SideQuests profile</h3>
+                  <p className="text-sm text-brand-text-muted mb-6">Sign in or create a free account to set up your Artist or Studio profile.</p>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <button onClick={() => openAuth('signup')} className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-6 py-3 rounded-xl">Create Account</button>
+                    <button onClick={() => openAuth('signin')} className="border border-white/15 text-white font-sans font-semibold text-xs px-6 py-3 rounded-xl hover:bg-white/5">Sign In</button>
+                  </div>
+                </div>
+              ) : (isEditingProfile || !hasProfile) ? (
                 <ProfileCreator
                   currentProfile={userProfile}
                   onSaveProfile={handleSaveUserProfile}
-                  onCancel={() => setIsEditingProfile(false)}
+                  onCancel={() => { if (hasProfile) setIsEditingProfile(false); else setActiveTab('quests'); }}
                   onNavigateToExplore={() => {
                     setActiveTab('quests');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2010,7 +1991,7 @@ export default function App() {
                     setActiveTab(tab);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  onOpenCreateQuestModal={() => setIsPostQuestModalOpen(true)}
+                  onOpenCreateQuestModal={openPostQuest}
                   currentUser={currentUser}
                   onGoogleSignIn={handleGoogleSignIn}
                   onGoogleSignOut={handleGoogleSignOut}
@@ -2252,8 +2233,7 @@ export default function App() {
                 </button>
                 <button 
                   onClick={() => {
-                    setHiringCreative(selectedCreative);
-                    setHireBudget('1500');
+                    handleDirectHire(selectedCreative);
                   }}
                   className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-6 py-2.5 rounded-lg hover:scale-[1.02] active:scale-95 transition-all shadow-md shadow-brand-volt/10"
                 >
@@ -2335,17 +2315,18 @@ export default function App() {
                 </button>
                 <button 
                   onClick={() => {
-                    handleApplyQuest(selectedQuest);
+                    const q = selectedQuest;
                     setSelectedQuest(null);
+                    handleApplyQuest(q);
                   }}
                   className={`font-sans text-xs font-bold px-6 py-2 rounded-lg transition-all ${
-                    selectedQuest.applied 
+                    appliedQuestIds.has(selectedQuest.id)
                       ? 'bg-brand-container-high text-brand-text-muted border border-white/10 cursor-not-allowed'
                       : 'bg-brand-volt text-brand-bg hover:scale-102 active:scale-95 shadow-md shadow-brand-volt/10'
                   }`}
-                  disabled={selectedQuest.applied}
+                  disabled={appliedQuestIds.has(selectedQuest.id) || selectedQuest.status !== 'open'}
                 >
-                  {selectedQuest.applied ? 'Applied' : 'Apply'}
+                  {appliedQuestIds.has(selectedQuest.id) ? 'Applied' : selectedQuest.status !== 'open' ? 'Closed' : 'Apply'}
                 </button>
               </div>
 
@@ -2523,6 +2504,18 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AuthModal
+        isOpen={authModal.open}
+        initialMode={authModal.mode}
+        onClose={() => setAuthModal(prev => ({ ...prev, open: false }))}
+      />
+
+      <ApplyModal
+        quest={applyingQuest}
+        onClose={() => setApplyingQuest(null)}
+        onSubmit={handleSubmitApplication}
+      />
 
       {/* Post Quest Modal for Gig Providers */}
       <PostQuestModal

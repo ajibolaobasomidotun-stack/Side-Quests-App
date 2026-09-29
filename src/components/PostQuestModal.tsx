@@ -32,6 +32,7 @@ export const PostQuestModal: React.FC<PostQuestModalProps> = ({
     'Immediate availability for rehearsals & recording'
   ]);
   const [newReq, setNewReq] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
   
   const [milestones, setMilestones] = useState<{ title: string; amount: number }[]>([
     { title: 'Phase 1: Initial Stems & Arrangement Demo', amount: 1750 },
@@ -53,19 +54,26 @@ export const PostQuestModal: React.FC<PostQuestModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const totalBudget = parseFloat(budget) || 2500;
+    const totalBudget = Math.round(parseFloat(budget));
+    if (title.trim().length < 3) { setFormError('Give your quest a title.'); return; }
+    if (description.trim().length < 20) { setFormError('Describe the work in at least a sentence or two.'); return; }
+    if (!totalBudget || totalBudget <= 0) { setFormError('Enter a budget in USD.'); return; }
+    setFormError(null);
 
     const newQuest: Quest = {
       id: `quest_${Date.now()}`,
-      title: title.trim() || 'High-Stakes Live Audio Production',
+      title: title.trim(),
       clientName: currentUser.displayName || 'Astral Tour Management',
       clientAvatar: currentUser.avatarUrl || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=400&h=400&fit=crop',
       category,
       budget: totalBudget,
       deadline: deadline || 'In 14 Days',
-      description: description.trim() || 'Seeking verified talent with professional touring credentials to lead audio operations for an upcoming production.',
+      description: description.trim(),
       requirements: requirements.length > 0 ? requirements : ['Pro audio verification', 'Immediate availability'],
-      milestones: milestones.map((m, idx) => ({
+      milestones: [
+        { title: milestones[0]?.title || 'Phase 1', amount: Math.round(totalBudget / 2) },
+        { title: milestones[1]?.title || 'Phase 2', amount: totalBudget - Math.round(totalBudget / 2) }
+      ].map((m, idx) => ({
         id: `qm_${Date.now()}_${idx}`,
         title: m.title,
         amount: m.amount,
@@ -233,6 +241,8 @@ export const PostQuestModal: React.FC<PostQuestModalProps> = ({
                 <span className="text-white font-semibold">Protected Payments:</span> The ${parseFloat(budget || '0').toLocaleString()} budget is paid up front when you select an applicant and released milestone by milestone.
               </div>
             </div>
+
+            {formError && <p className="text-xs text-red-400" role="alert">{formError}</p>}
 
             <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
               <button

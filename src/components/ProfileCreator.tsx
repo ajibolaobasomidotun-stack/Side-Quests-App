@@ -72,7 +72,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
   const [handle, setHandle] = useState(currentProfile.handle || '');
   const [roleHeadline, setRoleHeadline] = useState(currentProfile.roleHeadline || '');
   const [bio, setBio] = useState(currentProfile.bio || '');
-  const [location, setLocation] = useState(currentProfile.location || 'Los Angeles, CA');
+  const [location, setLocation] = useState(currentProfile.location || '');
   const [avatarUrl, setAvatarUrl] = useState(currentProfile.avatarUrl || AVATAR_PRESETS_ARTIST[0]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>(currentProfile.selectedCategories || []);
   
@@ -89,16 +89,12 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
     currentProfile.availability || 'available'
   );
   const [credits, setCredits] = useState<string[]>(
-    currentProfile.credits && currentProfile.credits.length > 0 
-      ? currentProfile.credits 
-      : ['Music Director - US Arena Tour', 'Dolby Atmos Mix - Platinum LP', 'Session Keys - Live Festival Broadcast']
+    currentProfile.credits || []
   );
   const [newCreditInput, setNewCreditInput] = useState('');
   
   const [gear, setGear] = useState<string[]>(
-    currentProfile.gear && currentProfile.gear.length > 0
-      ? currentProfile.gear
-      : ['Nord Stage 4', 'iConnectivity PlayAUDIO12 Rig', 'UAD Apollo x8p', 'Genelec 8330A Atmos System']
+    currentProfile.gear || []
   );
   const [newGearInput, setNewGearInput] = useState('');
 
@@ -108,7 +104,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
   const [websiteLink, setWebsiteLink] = useState(currentProfile.portfolioLinks?.website || '');
 
   // Gig Provider specific states
-  const [organizationName, setOrganizationName] = useState(currentProfile.organizationName || 'Astral Echo Records');
+  const [organizationName, setOrganizationName] = useState(currentProfile.organizationName || '');
   const [orgType, setOrgType] = useState<'Record Label' | 'Touring Agency' | 'Studio Facility' | 'Film / Game Audio' | 'Independent Producer' | 'Live Event Organizer'>(
     currentProfile.orgType || 'Record Label'
   );
@@ -116,7 +112,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
     currentProfile.budgetTier || 'tier_5k_25k'
   );
   const [hiringGoals, setHiringGoals] = useState<string[]>(
-    currentProfile.hiringGoals || ['Hiring FOH Engineer for Fall Tour', 'Looking for Atmos Mix Engineers', 'Session Drummer needed for album']
+    currentProfile.hiringGoals || []
   );
   const [newGoalInput, setNewGoalInput] = useState('');
 
@@ -189,21 +185,28 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
   };
 
   // Submit and Save
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const handleSave = () => {
+    if (!displayName.trim()) {
+      setSaveError('Please add your name (or your studio name) before publishing.');
+      return;
+    }
+    if (selectedCategories.length === 0) {
+      setSaveError('Pick at least one category so the right people can find you.');
+      return;
+    }
+    setSaveError(null);
     const finalProfile: UserProfile = {
       id: currentProfile.id || `user_${Date.now()}`,
       accountType,
-      displayName: displayName.trim() || (accountType === 'artist' ? 'Marcus Vane' : 'Astral Productions'),
-      handle: handle.trim() ? (handle.startsWith('@') ? handle.trim() : `@${handle.trim()}`) : '@creatives_pro',
-      roleHeadline: roleHeadline.trim() || (accountType === 'artist' ? 'Audio Engineer & Music Director' : 'Executive Producer'),
-      bio: bio.trim() || (accountType === 'artist' 
-        ? 'Professional music director and high-fidelity mix engineer delivering stadium tours and platinum records.' 
-        : 'Connecting premier talent with high-stakes tour production and label studio sessions.'),
-      location: location.trim() || 'Los Angeles, CA',
+      displayName: displayName.trim(),
+      handle: handle.trim() ? (handle.startsWith('@') ? handle.trim() : `@${handle.trim()}`) : '',
+      roleHeadline: roleHeadline.trim(),
+      bio: bio.trim(),
+      location: location.trim(),
       avatarUrl: avatarUrl || (accountType === 'artist' ? AVATAR_PRESETS_ARTIST[0] : AVATAR_PRESETS_PROVIDER[0]),
-      selectedCategories: selectedCategories.length > 0 
-        ? selectedCategories 
-        : (accountType === 'artist' ? ['cat_dolby_atmos', 'cat_music_director'] : ['prov_arena_tour', 'prov_major_label']),
+      selectedCategories,
       
       hourlyRate: accountType === 'artist' ? Number(hourlyRate) || 120 : undefined,
       experienceLevel: accountType === 'artist' ? experienceLevel : undefined,
@@ -220,7 +223,6 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
       organizationName: accountType === 'provider' ? organizationName : undefined,
       orgType: accountType === 'provider' ? orgType : undefined,
       budgetTier: accountType === 'provider' ? budgetTier : undefined,
-      verifiedEscrowFunded: accountType === 'provider' ? true : undefined,
       hiringGoals: accountType === 'provider' ? hiringGoals : undefined,
 
       createdAt: currentProfile.createdAt || new Date().toISOString().split('T')[0]
@@ -252,7 +254,6 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
             <span className="px-2.5 py-0.5 rounded-full bg-brand-volt/10 text-brand-volt border border-brand-volt/20 text-xs font-mono font-medium tracking-wider uppercase">
               Onboarding & Credentials
             </span>
-            <span className="text-brand-text-muted text-xs font-mono">• Protected Payments Ready</span>
           </div>
           <h2 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">
             Create Your <span className="text-brand-volt italic font-normal">SideQuests Profile</span>
@@ -959,6 +960,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                   <CheckCircle className="w-4 h-4" />
                   Save & Activate Profile
                 </button>
+                {saveError && <p className="text-xs text-red-400" role="alert">{saveError}</p>}
               </div>
 
             </div>
@@ -1108,7 +1110,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
               {/* Card Footer Actions */}
               <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-3">
                 <span className="text-[10px] font-mono text-brand-text-muted uppercase">
-                  Audited ID: {currentProfile.id || 'SQ-PRO-2026'} • 100% Payment Protected
+                  {saveError ? <span className="text-red-400 normal-case">{saveError}</span> : 'Review your details, then publish.'}
                 </span>
 
                 <button
