@@ -1,17 +1,30 @@
 {
-  "firestore": [
-    {
-      "database": "ai-studio-sidequests-d8fc5c27-cdf2-45c1-9ab9-388e2dfab5b7",
-      "rules": "firestore.rules"
-    }
-  ],
+  "firestore": {
+    "rules": "firestore.rules"
+  },
   "hosting": {
     "public": "dist",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "server.cjs", "server.cjs.map"],
-    "rewrites": [{ "source": "**", "destination": "/index.html" }]
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "server.cjs",
+      "server.cjs.map"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
   },
   "emulators": {
-    "firestore": { "host": "127.0.0.1", "port": 8080 },
-    "ui": { "enabled": false }
+    "firestore": {
+      "host": "127.0.0.1",
+      "port": 8080
+    },
+    "ui": {
+      "enabled": false
+    }
   }
 }
