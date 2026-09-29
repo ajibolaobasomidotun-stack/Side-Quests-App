@@ -118,6 +118,135 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------
+    // Contracts — id is "{questId}_{creativeUid}" (same as the application).
+    // Only the gig provider (client) and the hired creative can see them.
+    // ---------------------------------------------------------------
+    function contractPath(contractId) {
+      return /databases/$(database)/documents/contracts/$(contractId);
+    }
+
+    function isParticipantOf(contractId) {
+      return isSignedIn() && uid() in get(contractPath(contractId)).data.participants;
+    }
+
+    function statusMoves(from, to) {
+      return existing().status in from && incoming().status == to;
+    }
+
+    match /contracts/{contractId} {
+      allow read: if isSignedIn() && uid() in existing().participants;
+
+      // Created by the gig provider in the same write that accepts the application.
+      allow create: if isSignedIn()
+        && incoming().clientUid == uid()
+        && contractId == incoming().questId + '_' + incoming().creativeUid
+        && incoming().participants == [uid(), incoming().creativeUid]
+        && incoming().status == 'setup'
+        && incoming().totalAmount is number && incoming().totalAmount > 0
+        && get(/databases/$(database)/documents/quests/$(incoming().questId)).data.clientUid == uid()
+        && getAfter(/databases/$(database)/documents/applications/$(contractId)).data.status == 'accepted'
+        && getAfter(/databases/$(database)/documents/applications/$(contractId)).data.clientUid == uid()
+        && getAfter(/databases/$(database)/documents/applications/$(contractId)).data.applicantUid == incoming().creativeUid
+        && smallImageOrAbsent('clientAvatar')
+        && smallImageOrAbsent('creativeAvatar');
+
+      allow update: if isSignedIn() && uid() in existing().participants
+        && incoming().participants == existing().participants
+        && incoming().clientUid == existing().clientUid
+        && incoming().creativeUid == existing().creativeUid
+        && (
+          // Either party: chat preview only
+          (incoming().status == existing().status
+            && onlyChanges(['lastMessageAt', 'lastMessagePreview', 'lastMessageBy']))
+
+          // Gig provider
+          || (uid() == existing().clientUid && (
+                (existing().status == 'setup' && incoming().status == 'setup'
+                  && onlyChanges(['totalAmount', 'updatedAt'])
+                  && incoming().totalAmount is number && incoming().totalAmount > 0)
+             || (statusMoves(['setup'], 'proposed') && onlyChanges(['status', 'updatedAt', 'changeRequest']))
+             || (statusMoves(['setup', 'proposed'], 'cancelled') && onlyChanges(['status', 'updatedAt']))
+             || (statusMoves(['active'], 'completed') && onlyChanges(['status', 'updatedAt']))
+          ))
+
+          // Creative
+          || (uid() == existing().creativeUid && (
+                (statusMoves(['proposed'], 'active') && onlyChanges(['status', 'updatedAt']))
+             || (statusMoves(['proposed'], 'setup') && onlyChanges(['status', 'updatedAt', 'changeRequest'])
+                  && incoming().changeRequest is string && incoming().changeRequest.size() <= 2000)
+             || (statusMoves(['setup', 'proposed'], 'cancelled') && onlyChanges(['status', 'updatedAt']))
+          ))
+        );
+
+      allow delete: if false;
+
+      // --- Milestones -------------------------------------------------
+      match /milestones/{milestoneId} {
+        function contractAfter() {
+          return getAfter(contractPath(contractId)).data;
+        }
+        function contractNow() {
+          return get(contractPath(contractId)).data;
+        }
+        function validPlanItem() {
+          return incoming().title is string && incoming().title.size() >= 1 && incoming().title.size() <= 200
+            && incoming().amount is number && incoming().amount > 0
+            && incoming().order is int && incoming().order >= 0 && incoming().order < 20;
+        }
+
+        allow read: if isSignedIn() && uid() in contractNow().participants;
+
+        // Gig provider shapes the plan while the contract is in setup.
+        allow create: if isSignedIn()
+          && contractAfter().clientUid == uid()
+          && contractAfter().status == 'setup'
+          && incoming().status == 'pending'
+          && validPlanItem();
+
+        allow delete: if isSignedIn()
+          && contractNow().clientUid == uid()
+          && contractNow().status == 'setup';
+
+        allow update: if isSignedIn() && (
+          // Plan edits during setup (gig provider)
+          (contractNow().clientUid == uid() && contractNow().status == 'setup'
+            && onlyChanges(['title', 'amount', 'order'])
+            && validPlanItem())
+
+          // Creative submits work for review
+          || (contractNow().creativeUid == uid() && contractNow().status == 'active'
+            && existing().status in ['pending', 'changes_requested']
+            && incoming().status == 'submitted'
+            && onlyChanges(['status', 'submissionNote', 'submittedAt'])
+            && incoming().submissionNote is string && incoming().submissionNote.size() <= 2000)
+
+          // Gig provider approves or asks for changes
+          || (contractNow().clientUid == uid() && contractNow().status == 'active'
+            && existing().status == 'submitted'
+            && incoming().status in ['approved', 'changes_requested']
+            && onlyChanges(['status', 'feedback', 'reviewedAt'])
+            && incoming().feedback is string && incoming().feedback.size() <= 2000)
+        );
+      }
+
+      // --- Messages (append-only) ---------------------------------------
+      match /messages/{messageId} {
+        allow read: if isParticipantOf(contractId);
+
+        allow create: if isParticipantOf(contractId)
+          && incoming().senderUid == uid()
+          && incoming().type in ['text', 'file', 'system']
+          && incoming().text is string && incoming().text.size() <= 4000
+          && incoming().createdAt == request.time
+          && (incoming().type != 'file'
+              || (incoming().file.path is string
+                  && incoming().file.path.matches('contracts/' + contractId + '/' + uid() + '/.*')));
+
+        allow update, delete: if false;
+      }
+    }
+
+    // ---------------------------------------------------------------
     // Bookmarks — private to each user.
     // ---------------------------------------------------------------
     match /bookmarks/{bookmarkId} {

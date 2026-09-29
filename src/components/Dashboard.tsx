@@ -16,6 +16,7 @@ interface DashboardProps {
   onDecline: (app: Application) => Promise<void>;
   onWithdraw: (app: Application) => Promise<void>;
   onSetQuestStatus: (quest: Quest, status: Quest['status']) => Promise<void>;
+  onOpenContract: (contractId: string) => void;
 }
 
 const statusChip: Record<string, string> = {
@@ -89,10 +90,10 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                         Close quest
                       </button>
                     )}
-                    {quest.status === 'active' && (
-                      <button disabled={busyId === quest.id} onClick={() => act(quest.id, () => props.onSetQuestStatus(quest, 'completed'))}
-                        className="text-xs text-brand-text-muted border border-white/10 hover:text-white px-3 py-1.5 rounded-lg">
-                        Mark completed
+                    {quest.status !== 'open' && quest.hiredUid && (
+                      <button onClick={() => props.onOpenContract(`${quest.id}_${quest.hiredUid}`)}
+                        className="text-xs font-bold bg-brand-volt text-brand-bg px-3 py-1.5 rounded-lg">
+                        Open contract
                       </button>
                     )}
                   </div>
@@ -180,6 +181,11 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 </div>
                 <div className="flex items-center gap-3">
                   <Chip status={a.status} />
+                  {a.status === 'accepted' && (
+                    <button onClick={() => props.onOpenContract(a.id)} className="text-xs font-bold bg-brand-volt text-brand-bg px-3 py-1.5 rounded-lg">
+                      Open contract
+                    </button>
+                  )}
                   {a.status === 'pending' && (
                     <button disabled={busyId === a.id} onClick={() => act(a.id, () => props.onWithdraw(a))}
                       className="text-xs text-brand-text-muted hover:text-red-300 underline">

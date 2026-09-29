@@ -1,0 +1,27 @@
+rules_version = '2';
+
+// Files delivered inside a contract. Only the two people on the contract can
+// read them; each person can only upload into their own folder.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /contracts/{contractId}/{uploaderUid}/{fileName} {
+      function isParticipant() {
+        return request.auth != null
+          && request.auth.uid in firestore.get(/databases/(default)/documents/contracts/$(contractId)).data.participants;
+      }
+
+      allow read: if isParticipant();
+
+      allow create: if isParticipant()
+        && request.auth.uid == uploaderUid
+        && request.resource.size < 1024 * 1024 * 1024;
+
+      allow update, delete: if false;
+    }
+
+    // Everything else is closed.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -50,7 +50,7 @@ import {
 } from './components/Icons'; // Using simple fallback SVGs or Lucide/material-styled custom icons for ultimate reliability
 
 import { motion, AnimatePresence } from 'motion/react';
-import { Creative, Quest, Task, Article, UserProfile, AccountType, Application } from './types';
+import { Creative, Quest, Article, UserProfile, AccountType, Application, Contract } from './types';
 import { LEARN_ARTICLES } from './data';
 import { GIG_CATEGORIES, GIG_CATEGORY_KEYS } from './categories';
 import { INITIAL_USER_PROFILE, ARTIST_CATEGORIES, PROVIDER_CATEGORIES } from './profileData';
@@ -61,6 +61,8 @@ import { AuthModal } from './components/AuthModal';
 import { ApplyModal } from './components/ApplyModal';
 import { Dashboard } from './components/Dashboard';
 import { Avatar } from './components/Avatar';
+import { ContractsPanel } from './components/ContractsPanel';
+import { hireAndCreateContract, subscribeMyContracts } from './lib/contracts';
 import {
   auth,
   signOutUser,
@@ -85,8 +87,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'quests' | 'creatives' | 'learn' | 'pricing' | 'tasks' | 'profile'>('quests');
   const [quests, setQuests] = useState<Quest[]>([]);
   const [artistProfiles, setArtistProfiles] = useState<UserProfile[]>([]);
-  // Contracts (OS Console) arrive with Protected Payments; nothing is simulated in the meantime.
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
+  const [consoleTab, setConsoleTab] = useState<'contracts' | 'quests'>('contracts');
   const [myApplications, setMyApplications] = useState<Application[]>([]);
   const [receivedApplications, setReceivedApplications] = useState<Application[]>([]);
   const [hasProfile, setHasProfile] = useState<boolean>(false);
@@ -109,26 +112,6 @@ export default function App() {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [selectedQuest, setSelectedQuest] = useState<Quest | null>(null);
   
-  // Custom hiring state
-  const [hiringCreative, setHiringCreative] = useState<Creative | null>(null);
-  const [hireTitle, setHireTitle] = useState('');
-  const [hireBudget, setHireBudget] = useState('1500');
-  const [hireDescription, setHireDescription] = useState('');
-  const [hireMilestoneCount, setHireMilestoneCount] = useState('2');
-
-  // Active task details inside the Tasks tab
-  const [activeTaskId, setActiveTaskId] = useState<string>('t1');
-  const [taskViewRole, setTaskViewRole] = useState<'artist' | 'client'>('artist');
-  const [chatMessage, setChatMessage] = useState('');
-  const [fileToUpload, setFileToUpload] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-
-  // Audio player mock state
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [playbackProgress, setPlaybackProgress] = useState(35);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
   // Notification Toast state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
@@ -219,11 +202,14 @@ export default function App() {
     if (!currentUser) {
       setMyApplications([]);
       setReceivedApplications([]);
+      setContracts([]);
+      setSelectedContractId(null);
       return;
     }
+    const unsubContracts = subscribeMyContracts(currentUser.uid, setContracts);
     const unsubMine = subscribeMyApplications(currentUser.uid, setMyApplications);
     const unsubReceived = subscribeReceivedApplications(currentUser.uid, setReceivedApplications);
-    return () => { unsubMine(); unsubReceived(); };
+    return () => { unsubContracts(); unsubMine(); unsubReceived(); };
   }, [currentUser]);
 
   const appliedQuestIds = new Set(myApplications.map(a => a.questId));
@@ -400,11 +386,23 @@ export default function App() {
     showToast('Application sent! Track it in the OS Console.', 'success');
   };
 
+  const openContract = (contractId: string) => {
+    setActiveTab('tasks');
+    setConsoleTab('contracts');
+    setSelectedContractId(contractId);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleAcceptApplication = async (app: Application) => {
+    const quest = quests.find(q => q.id === app.questId);
+    if (!quest || !currentUser) {
+      showToast('Could not find that quest. Please refresh and try again.', 'error');
+      return;
+    }
     try {
-      await setApplicationStatus(app.id, 'accepted');
-      await setQuestStatus(app.questId, 'active', app.applicantUid);
-      showToast(`You hired ${app.applicantName}!`, 'success');
+      const contractId = await hireAndCreateContract(app, quest, { ...userProfile, id: currentUser.uid });
+      showToast(`You hired ${app.applicantName}! Agree the milestones to get started.`, 'success');
+      openContract(contractId);
     } catch (err) {
       console.warn(err);
       showToast('Could not complete the hire. Please try again.', 'error');
@@ -440,235 +438,12 @@ export default function App() {
     showToast('Direct hiring arrives with Protected Payments. For now, post a quest and they can apply.', 'info');
   };
 
-  const handleCreateCustomHire = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!hiringCreative) return;
-
-    const totalBudget = parseFloat(hireBudget) || 1000;
-    
-    // Create custom milestones based on input count
-    const mCount = parseInt(hireMilestoneCount) || 2;
-    const milestoneAmount = Math.round(totalBudget / mCount);
-    const milestones = Array.from({ length: mCount }).map((_, idx) => ({
-      id: `custom_m_${Date.now()}_${idx}`,
-      title: idx === mCount - 1 ? 'Final Master Delivery & Approval' : `Milestone Phase ${idx + 1} Deliverable`,
-      amount: idx === mCount - 1 ? totalBudget - (milestoneAmount * (mCount - 1)) : milestoneAmount,
-      status: 'escrowed' as const
-    }));
-
-    // Create custom task
-    const newTask: Task = {
-      id: `task_custom_${Date.now()}`,
-      questId: `custom_q_${Date.now()}`,
-      questTitle: hireTitle || `Direct Session: ${hiringCreative.name}`,
-      clientName: 'You (Studio Client)',
-      artistName: hiringCreative.name,
-      category: hiringCreative.role === 'engineer' ? 'Studio Sessions' : hiringCreative.role === 'md' ? 'Live Performance' : 'Production',
-      totalBudget: totalBudget,
-      escrowBalance: totalBudget,
-      releasedAmount: 0,
-      status: 'active',
-      role: 'client',
-      currentMilestoneIndex: 0,
-      milestones: milestones,
-      messages: [
-        {
-          id: `m_c_1`,
-          sender: 'client',
-          text: `Hey ${hiringCreative.name}! I’ve set up a custom session: "${hireTitle || `Direct Session`}" and funded $${totalBudget.toLocaleString()} through SideQuests Protected Payments. Ready when you are!`,
-          time: 'Just now'
-        }
-      ],
-      files: []
-    };
-
-    setTasks(prev => [newTask, ...prev]);
-    setActiveTaskId(newTask.id);
-    setTaskViewRole('client');
-    setHiringCreative(null);
-    setSelectedCreative(null);
-    
-    // Clear form
-    setHireTitle('');
-    setHireBudget('1500');
-    setHireDescription('');
-    setHireMilestoneCount('2');
-
-    showToast(`Session funded! $${totalBudget.toLocaleString()} secured.`, 'success');
-    setActiveTab('tasks');
-  };
-
-  const activeTask = tasks.find(t => t.id === activeTaskId) || tasks[0];
-
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatMessage.trim() || !activeTask) return;
-
-    const newMsg = {
-      id: `msg_user_${Date.now()}`,
-      sender: activeTask.role,
-      text: chatMessage,
-      time: 'Just now'
-    };
-
-    // Update state
-    setTasks(prev => prev.map(t => {
-      if (t.id === activeTask.id) {
-        return {
-          ...t,
-          messages: [...t.messages, newMsg]
-        };
-      }
-      return t;
-    }));
-
-    setChatMessage('');
-
-    // Trigger mock auto-reply after 2 seconds to make the chat feel functional
-    setTimeout(() => {
-      if (!activeTask) return;
-      const counterparty = activeTask.role === 'artist' ? 'client' : 'artist';
-      const responseName = counterparty === 'artist' ? activeTask.artistName.replace(' (You)', '') : activeTask.clientName.replace(' (You)', '');
-      
-      const responseText = counterparty === 'artist' 
-        ? `Thanks! Got your message. I am tracking this in my DAW right now and will upload a progress stem shortly.`
-        : `Got it! Let’s keep pushing on these milestones. The protected balance looks good on my end. Cheers!`;
-
-      const autoMsg = {
-        id: `msg_auto_${Date.now()}`,
-        sender: counterparty,
-        text: responseText,
-        time: 'Just now'
-      };
-
-      setTasks(prev => prev.map(t => {
-        if (t.id === activeTask.id) {
-          // Prevent duplicating if they changed tasks in the meantime
-          return {
-            ...t,
-            messages: [...t.messages, autoMsg]
-          };
-        }
-        return t;
-      }));
-      showToast(`New message from ${responseName}`, 'info');
-    }, 3000);
-  };
-
-  const handleFileUploadSimulate = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !activeTask) return;
-
-    setIsUploading(true);
-    setUploadProgress(10);
-
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            const newFile = {
-              id: `f_${Date.now()}`,
-              name: file.name,
-              size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-              uploadedAt: 'Just now',
-              uploadedBy: activeTask.role,
-              url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' // Live fallback mp3
-            };
-
-            setTasks(prevTasks => prevTasks.map(t => {
-              if (t.id === activeTask.id) {
-                // If artist uploads, let's also automatically submit the current pending milestone!
-                const updatedMilestones = [...t.milestones];
-                const currentIdx = t.currentMilestoneIndex;
-                if (currentIdx < updatedMilestones.length && updatedMilestones[currentIdx].status === 'escrowed' && t.role === 'artist') {
-                  updatedMilestones[currentIdx] = {
-                    ...updatedMilestones[currentIdx],
-                    status: 'submitted',
-                    submittedFile: newFile.url,
-                    submittedFileName: newFile.name,
-                    submittedAt: 'Just now'
-                  };
-                }
-
-                return {
-                  ...t,
-                  files: [newFile, ...t.files],
-                  milestones: updatedMilestones
-                };
-              }
-              return t;
-            }));
-
-            setIsUploading(false);
-            setUploadProgress(0);
-            showToast(`${file.name} uploaded successfully!`, 'success');
-          }, 500);
-          return 100;
-        }
-        return prev + 30;
-      });
-    }, 300);
-  };
-
-  const handleReleaseEscrow = (taskId: string, milestoneId: string) => {
-    setTasks(prevTasks => prevTasks.map(t => {
-      if (t.id === taskId) {
-        const updatedMilestones = t.milestones.map(m => {
-          if (m.id === milestoneId) {
-            return { ...m, status: 'released' as const };
-          }
-          return m;
-        });
-
-        const releasedMilestone = t.milestones.find(m => m.id === milestoneId);
-        const releaseAmount = releasedMilestone ? releasedMilestone.amount : 0;
-
-        const newEscrowBalance = Math.max(0, t.escrowBalance - releaseAmount);
-        const newReleasedAmount = t.releasedAmount + releaseAmount;
-        const nextMilestoneIdx = t.currentMilestoneIndex + 1;
-
-        // check if completely done
-        const isCompleted = updatedMilestones.every(m => m.status === 'released');
-
-        return {
-          ...t,
-          escrowBalance: newEscrowBalance,
-          releasedAmount: newReleasedAmount,
-          milestones: updatedMilestones,
-          currentMilestoneIndex: nextMilestoneIdx,
-          status: isCompleted ? 'completed' : 'active'
-        };
-      }
-      return t;
-    }));
-
-    showToast('Milestone payment released to Artist!', 'success');
-  };
-
   const scrollToQuests = () => {
     setActiveTab('quests');
     setTimeout(() => {
       questsSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
   };
-
-  // Synchronize playback progress bar simulation
-  useEffect(() => {
-    let timer: any;
-    if (isPlaying) {
-      timer = setInterval(() => {
-        setPlaybackProgress(prev => {
-          if (prev >= 100) {
-            setIsPlaying(false);
-            return 0;
-          }
-          return prev + 1;
-        });
-      }, 800);
-    }
-    return () => clearInterval(timer);
-  }, [isPlaying]);
 
   return (
     <div className="bg-brand-bg text-on-surface font-sans antialiased selection:bg-brand-volt selection:text-brand-bg min-h-screen relative flex flex-col">
@@ -1524,365 +1299,71 @@ export default function App() {
           {/* TASKS / GIG OPERATING SYSTEM CONSOLE VIEW */}
           {activeTab === 'tasks' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-6">
-              
-              <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                 <div>
                   <h3 className="font-display text-2xl md:text-3xl text-white font-semibold flex items-center gap-2">
                     <TaskAlt className="w-7 h-7 text-brand-volt" />
                     OS Console
                   </h3>
-                  <p className="text-brand-text-muted text-xs mt-1">Your quests, applications and hires</p>
+                  <p className="text-brand-text-muted text-xs mt-1">Your contracts, quests and applications</p>
                 </div>
-                
-                {/* Role Switcher (contracts arrive with Protected Payments) */}
-                {tasks.length > 0 && (
-                <div className="flex bg-brand-container border border-white/10 p-1 rounded-xl w-fit">
-                  <button onClick={() => setTaskViewRole('artist')} className={`px-4 py-1.5 rounded-lg font-sans text-xs font-semibold uppercase tracking-wider transition-all ${taskViewRole === 'artist' ? 'bg-brand-volt text-brand-bg font-bold' : 'text-brand-text-muted hover:text-white'}`}>My Gigs (Artist)</button>
-                  <button onClick={() => setTaskViewRole('client')} className={`px-4 py-1.5 rounded-lg font-sans text-xs font-semibold uppercase tracking-wider transition-all ${taskViewRole === 'client' ? 'bg-brand-volt text-brand-bg font-bold' : 'text-brand-text-muted hover:text-white'}`}>My Hires (Client)</button>
-                </div>
-                )}
-              </div>
-
-              <div className="mb-10">
-                {!currentUser ? (
-                  <div className="bg-brand-container border border-white/5 rounded-2xl p-10 text-center">
-                    <p className="text-sm text-white font-semibold mb-1">Sign in to see your quests and applications</p>
-                    <button onClick={() => openAuth('signin')} className="mt-3 bg-brand-volt text-brand-bg font-sans font-bold text-xs px-5 py-2.5 rounded-xl">Sign In</button>
-                  </div>
-                ) : !hasProfile ? (
-                  <div className="bg-brand-container border border-white/5 rounded-2xl p-10 text-center">
-                    <p className="text-sm text-white font-semibold mb-1">Finish setting up your profile first</p>
-                    <button onClick={() => { setActiveTab('profile'); setIsEditingProfile(true); }} className="mt-3 bg-brand-volt text-brand-bg font-sans font-bold text-xs px-5 py-2.5 rounded-xl">Set Up Profile</button>
-                  </div>
-                ) : (
-                  <Dashboard
-                    uid={currentUser.uid}
-                    profile={userProfile}
-                    quests={quests}
-                    myApplications={myApplications}
-                    receivedApplications={receivedApplications}
-                    onPostQuest={openPostQuest}
-                    onBrowseQuests={scrollToQuests}
-                    onViewQuest={(q) => setSelectedQuest(q)}
-                    onAccept={handleAcceptApplication}
-                    onDecline={handleDeclineApplication}
-                    onWithdraw={handleWithdrawApplication}
-                    onSetQuestStatus={handleSetQuestStatus}
-                  />
-                )}
-              </div>
-
-              {tasks.length > 0 && (<>
-              {/* Split layout: sidebar tasks list + active workspace */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                
-                {/* Sidebar list of contracts */}
-                <div className="lg:col-span-4 space-y-3">
-                  <span className="font-mono text-[10px] text-brand-text-muted uppercase tracking-widest font-semibold block mb-2">Contracts list</span>
-                  
-                  {tasks.filter(t => t.role === taskViewRole).length === 0 ? (
-                    <div className="bg-brand-container border border-white/5 p-6 rounded-2xl text-center">
-                      <p className="text-xs text-brand-text-muted">No active contracts in this view.</p>
-                      {taskViewRole === 'artist' ? (
-                        <button onClick={() => scrollToQuests()} className="text-brand-volt text-xs font-semibold font-mono mt-3 uppercase hover:underline">Apply to a Quest</button>
-                      ) : (
-                        <button onClick={() => setActiveTab('creatives')} className="text-brand-volt text-xs font-semibold font-mono mt-3 uppercase hover:underline">Browse Vetted Creatives</button>
-                      )}
-                    </div>
-                  ) : (
-                    tasks
-                      .filter(t => t.role === taskViewRole)
-                      .map((task) => (
-                        <button
-                          key={task.id}
-                          onClick={() => setActiveTaskId(task.id)}
-                          className={`w-full text-left p-4 rounded-xl border transition-all ${
-                            task.id === activeTaskId 
-                              ? 'bg-brand-container-high border-brand-volt/30 shadow-lg shadow-brand-volt/5' 
-                              : 'bg-brand-container border-white/5 hover:border-white/10'
-                          }`}
-                        >
-                          <div className="flex justify-between items-start gap-2 mb-2">
-                            <span className="font-mono text-[9px] text-brand-volt uppercase tracking-wider bg-brand-volt/5 border border-brand-volt/10 px-2 py-0.5 rounded">
-                              {task.category}
-                            </span>
-                            <span className="font-mono text-xs font-bold text-white">${task.totalBudget.toLocaleString()}</span>
-                          </div>
-                          <h4 className="text-sm font-semibold text-white line-clamp-1 mb-1">{task.questTitle}</h4>
-                          <div className="flex justify-between items-center text-[10px] text-brand-text-muted">
-                            <span>Counterparty: <span className="text-white font-medium">{task.role === 'artist' ? task.clientName : task.artistName}</span></span>
-                            <span className="flex items-center gap-1">
-                              <span className={`w-1.5 h-1.5 rounded-full ${task.status === 'completed' ? 'bg-emerald-500' : 'bg-brand-volt animate-pulse'}`}></span>
-                              {task.status === 'completed' ? 'Done' : 'Active'}
-                            </span>
-                          </div>
-                        </button>
-                      ))
-                  )}
-                </div>
-
-                {/* Main operational panel */}
-                {activeTask && activeTask.role === taskViewRole ? (
-                  <div className="lg:col-span-8 bg-brand-container border border-white/5 rounded-2xl p-6">
-                    
-                    {/* Header summary info */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-white/5 mb-6">
-                      <div>
-                        <span className="font-mono text-[9px] text-brand-volt uppercase tracking-wider block mb-1">PROTECTED PAYMENT ACTIVE</span>
-                        <h4 className="font-display text-xl text-white font-bold leading-tight">{activeTask.questTitle}</h4>
-                        <p className="text-xs text-brand-text-muted mt-1">
-                          {activeTask.role === 'artist' ? `Contract with ${activeTask.clientName}` : `Contracting ${activeTask.artistName}`}
-                        </p>
-                      </div>
-
-                      {/* Payment specs */}
-                      <div className="flex gap-4 bg-brand-bg border border-white/5 p-3 rounded-xl font-mono text-[11px]">
-                        <div>
-                          <span className="text-brand-text-muted block">Protected Balance</span>
-                          <span className="text-brand-volt font-bold text-sm">${activeTask.escrowBalance.toLocaleString()}</span>
-                        </div>
-                        <div className="w-px bg-white/10"></div>
-                        <div>
-                          <span className="text-brand-text-muted block">Released Funds</span>
-                          <span className="text-white font-bold text-sm">${activeTask.releasedAmount.toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Operational tabs layout inside Workspace */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      
-                      {/* Left half: Milestones tracker */}
-                      <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <h5 className="font-mono text-[10px] text-brand-text-muted uppercase tracking-widest font-semibold">Milestones Roadmap</h5>
-                          <span className="font-mono text-[9px] text-brand-volt bg-brand-volt/5 border border-brand-volt/10 px-2 py-0.5 rounded">
-                            Phase {activeTask.currentMilestoneIndex + 1} of {activeTask.milestones.length}
-                          </span>
-                        </div>
-
-                        <div className="space-y-3">
-                          {activeTask.milestones.map((milestone, idx) => {
-                            const isCurrent = idx === activeTask.currentMilestoneIndex;
-                            const isReleased = milestone.status === 'released';
-                            const isSubmitted = milestone.status === 'submitted';
-
-                            return (
-                              <div 
-                                key={milestone.id}
-                                className={`p-4 rounded-xl border transition-all ${
-                                  isCurrent && activeTask.status !== 'completed'
-                                    ? 'bg-brand-volt/5 border-brand-volt/30'
-                                    : isReleased
-                                    ? 'bg-white/[0.01] border-white/5 opacity-60'
-                                    : 'bg-brand-bg border-white/5'
-                                }`}
-                              >
-                                <div className="flex justify-between items-start gap-2 mb-2">
-                                  <h6 className="text-xs font-semibold text-white">{milestone.title}</h6>
-                                  <span className="font-mono text-xs font-bold text-white">${milestone.amount.toLocaleString()}</span>
-                                </div>
-
-                                <div className="flex items-center justify-between pt-1 text-[10px]">
-                                  <span className="font-mono text-brand-text-muted">
-                                    Status: {' '}
-                                    <span className={
-                                      isReleased ? 'text-emerald-400' : isSubmitted ? 'text-blue-400' : 'text-brand-volt'
-                                    }>
-                                      {isReleased ? 'RELEASED' : isSubmitted ? 'SUBMITTED / PENDING' : 'FUNDED'}
-                                    </span>
-                                  </span>
-
-                                  {/* Action Buttons based on role */}
-                                  {activeTask.role === 'client' && isSubmitted && (
-                                    <button
-                                      onClick={() => handleReleaseEscrow(activeTask.id, milestone.id)}
-                                      className="bg-brand-volt text-brand-bg font-sans font-bold px-3 py-1 rounded hover:scale-105 active:scale-95 transition-all"
-                                    >
-                                      Release ${milestone.amount.toLocaleString()}
-                                    </button>
-                                  )}
-
-                                  {activeTask.role === 'artist' && isCurrent && !isSubmitted && !isReleased && (
-                                    <span className="text-[9px] font-mono text-brand-volt uppercase tracking-wider animate-pulse">
-                                      Upload Deliverable to Submit
-                                    </span>
-                                  )}
-                                </div>
-
-                                {isSubmitted && milestone.submittedFileName && (
-                                  <div className="mt-3 bg-brand-bg p-2 rounded border border-white/10 flex items-center justify-between text-xs">
-                                    <span className="text-white line-clamp-1">{milestone.submittedFileName}</span>
-                                    {milestone.submittedFile && (
-                                      <button 
-                                        onClick={() => {
-                                          setIsPlaying(!isPlaying);
-                                          showToast(isPlaying ? 'Mock playback paused' : 'Mock playback started!', 'info');
-                                        }}
-                                        className="text-brand-volt hover:underline flex items-center gap-1 font-semibold"
-                                      >
-                                        {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <PlayArrow className="w-3.5 h-3.5" />}
-                                        {isPlaying ? 'Pause' : 'Review'}
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Right half: Files and Messages */}
-                      <div className="space-y-6">
-                        
-                        {/* Audio Player (Mock waveform of review) */}
-                        {isPlaying && (
-                          <div className="bg-brand-bg border border-brand-volt/20 p-4 rounded-xl">
-                            <span className="font-mono text-[8px] text-brand-volt uppercase block tracking-wider mb-2 animate-pulse">ACTIVE REVIEW AUDIO TRACK</span>
-                            <div className="flex items-center gap-3">
-                              <button onClick={() => setIsPlaying(false)} className="w-8 h-8 rounded-full bg-brand-volt flex items-center justify-center text-brand-bg">
-                                <Pause className="w-4 h-4" />
-                              </button>
-                              <div className="flex-1">
-                                <span className="text-xs text-white block font-semibold truncate">Reviewing rough stems mix.mp3</span>
-                                <div className="h-1 bg-white/10 rounded-full mt-2 relative overflow-hidden">
-                                  <div style={{ width: `${playbackProgress}%` }} className="absolute h-full bg-brand-volt shadow-[0_0_10px_rgba(195,244,0,0.8)]"></div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Files Synchronization Manager */}
-                        <div>
-                          <div className="flex items-center justify-between mb-3">
-                            <h5 className="font-mono text-[10px] text-brand-text-muted uppercase tracking-widest font-semibold">Files Locker</h5>
-                            
-                            {/* File upload selector */}
-                            <label className="text-brand-volt hover:text-white transition-colors text-xs font-semibold cursor-pointer flex items-center gap-1 font-mono uppercase tracking-wider">
-                              <AttachFile className="w-3.5 h-3.5" />
-                              Add File
-                              <input 
-                                type="file" 
-                                accept="audio/*,application/zip" 
-                                className="hidden" 
-                                onChange={handleFileUploadSimulate}
-                                disabled={isUploading}
-                              />
-                            </label>
-                          </div>
-
-                          {isUploading && (
-                            <div className="bg-brand-container-high p-3 rounded-xl border border-brand-volt/20 mb-3 text-xs">
-                              <span className="text-brand-volt font-mono font-bold block mb-1">Uploading and phase aligning... {uploadProgress}%</span>
-                              <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                                <div style={{ width: `${uploadProgress}%` }} className="h-full bg-brand-volt transition-all"></div>
-                              </div>
-                            </div>
-                          )}
-
-                          {activeTask.files.length === 0 ? (
-                            <div className="p-6 border border-dashed border-white/10 rounded-xl text-center bg-brand-bg/50">
-                              <FileUpload className="w-6 h-6 text-brand-text-muted mx-auto mb-2" />
-                              <p className="text-[11px] text-brand-text-muted leading-normal">
-                                Drop stems, rough tracks, or ADM BWF masters. Uploading automatically submits the current milestone.
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                              {activeTask.files.map((f) => (
-                                <div key={f.id} className="p-2.5 bg-brand-bg border border-white/5 rounded-xl flex items-center justify-between text-xs">
-                                  <div className="flex items-center gap-2 truncate">
-                                    <FolderZip className="w-4 h-4 text-brand-volt flex-shrink-0" />
-                                    <div className="truncate">
-                                      <span className="text-white block font-medium truncate">{f.name}</span>
-                                      <span className="text-[9px] text-brand-text-muted font-mono">{f.size} • By {f.uploadedBy === 'artist' ? 'Artist' : 'Client'}</span>
-                                    </div>
-                                  </div>
-                                  <button 
-                                    onClick={() => {
-                                      setIsPlaying(true);
-                                      showToast(`Streaming ${f.name}`, 'info');
-                                    }}
-                                    className="p-1 hover:text-brand-volt text-brand-text-muted transition-colors"
-                                    aria-label="Play track"
-                                  >
-                                    <PlayArrow className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Interactive Message Chat */}
-                        <div>
-                          <h5 className="font-mono text-[10px] text-brand-text-muted uppercase tracking-widest font-semibold mb-3">Live Session Chat</h5>
-                          
-                          <div className="bg-brand-bg border border-white/5 rounded-xl flex flex-col h-60">
-                            {/* Messages display */}
-                            <div className="flex-1 overflow-y-auto p-3 space-y-2.5 max-h-52">
-                              {activeTask.messages.map((m) => {
-                                const isMe = m.sender === activeTask.role;
-                                return (
-                                  <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                                    <div className={`p-2.5 rounded-xl max-w-[85%] text-xs ${
-                                      isMe 
-                                        ? 'bg-brand-volt text-brand-bg font-medium rounded-tr-none' 
-                                        : 'bg-brand-container border border-white/10 text-white rounded-tl-none'
-                                    }`}>
-                                      <p className="leading-normal">{m.text}</p>
-                                    </div>
-                                    <span className="text-[8px] text-brand-text-muted font-mono mt-0.5 px-1">{m.time}</span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-
-                            {/* Input Form */}
-                            <form onSubmit={handleSendMessage} className="p-2 border-t border-white/5 flex gap-1.5 bg-brand-container-high/40 rounded-b-xl">
-                              <input
-                                type="text"
-                                value={chatMessage}
-                                onChange={(e) => setChatMessage(e.target.value)}
-                                placeholder="Message session counterparty..."
-                                className="flex-1 bg-transparent text-xs text-white focus:outline-none px-2 py-1 placeholder:text-brand-text-muted"
-                              />
-                              <button type="submit" className="p-1.5 bg-brand-volt hover:scale-105 active:scale-95 transition-all text-brand-bg rounded-lg">
-                                <Send className="w-3.5 h-3.5 text-brand-bg" />
-                              </button>
-                            </form>
-                          </div>
-                        </div>
-
-                      </div>
-
-                    </div>
-
-                  </div>
-                ) : (
-                  <div className="lg:col-span-8 bg-brand-container border border-white/5 rounded-2xl p-12 text-center">
-                    <Checklist className="w-12 h-12 text-brand-text-muted mx-auto mb-4" />
-                    <h4 className="text-lg text-white font-bold font-display mb-2">No Active Contract Selected</h4>
-                    <p className="text-xs text-brand-text-muted max-w-sm mx-auto mb-6">
-                      Toggle roles above or select one of your ongoing gigs on the left to review tracks, write messages, and release milestone payments.
-                    </p>
-                    {taskViewRole === 'artist' ? (
-                      <button onClick={() => scrollToQuests()} className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-6 py-3 rounded-xl hover:scale-105 transition-all">
-                        Apply to Open Quests
+                {currentUser && hasProfile && (
+                  <div className="flex bg-brand-container border border-white/10 p-1 rounded-xl w-fit">
+                    {([
+                      ['contracts', `Contracts${contracts.length ? ` (${contracts.length})` : ''}`],
+                      ['quests', userProfile.accountType === 'provider' ? 'Quests & Applicants' : 'My Applications']
+                    ] as const).map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setConsoleTab(key)}
+                        className={`px-4 py-1.5 rounded-lg font-sans text-xs font-semibold uppercase tracking-wider transition-all ${
+                          consoleTab === key ? 'bg-brand-volt text-brand-bg font-bold' : 'text-brand-text-muted hover:text-white'
+                        }`}
+                      >
+                        {label}
                       </button>
-                    ) : (
-                      <button onClick={() => setActiveTab('creatives')} className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-6 py-3 rounded-xl hover:scale-105 transition-all">
-                        Browse Creatives
-                      </button>
-                    )}
+                    ))}
                   </div>
                 )}
-
               </div>
-              </>)}
 
+              {!currentUser ? (
+                <div className="bg-brand-container border border-white/5 rounded-2xl p-10 text-center">
+                  <p className="text-sm text-white font-semibold mb-1">Sign in to see your contracts, quests and applications</p>
+                  <button onClick={() => openAuth('signin')} className="mt-3 bg-brand-volt text-brand-bg font-sans font-bold text-xs px-5 py-2.5 rounded-xl">Sign In</button>
+                </div>
+              ) : !hasProfile ? (
+                <div className="bg-brand-container border border-white/5 rounded-2xl p-10 text-center">
+                  <p className="text-sm text-white font-semibold mb-1">Finish setting up your profile first</p>
+                  <button onClick={() => { setActiveTab('profile'); setIsEditingProfile(true); }} className="mt-3 bg-brand-volt text-brand-bg font-sans font-bold text-xs px-5 py-2.5 rounded-xl">Set Up Profile</button>
+                </div>
+              ) : consoleTab === 'contracts' ? (
+                <ContractsPanel
+                  uid={currentUser.uid}
+                  profile={userProfile}
+                  contracts={contracts}
+                  selectedId={selectedContractId}
+                  onSelect={setSelectedContractId}
+                  onBrowse={() => (userProfile.accountType === 'provider' ? setConsoleTab('quests') : scrollToQuests())}
+                  showToast={showToast}
+                />
+              ) : (
+                <Dashboard
+                  uid={currentUser.uid}
+                  profile={userProfile}
+                  quests={quests}
+                  myApplications={myApplications}
+                  receivedApplications={receivedApplications}
+                  onPostQuest={openPostQuest}
+                  onBrowseQuests={scrollToQuests}
+                  onViewQuest={(q) => setSelectedQuest(q)}
+                  onAccept={handleAcceptApplication}
+                  onDecline={handleDeclineApplication}
+                  onWithdraw={handleWithdrawApplication}
+                  onSetQuestStatus={handleSetQuestStatus}
+                  onOpenContract={openContract}
+                />
+              )}
             </motion.div>
           )}
 
@@ -2322,115 +1803,6 @@ export default function App() {
                   Mark Completed
                 </button>
               </div>
-
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Hire & Fund custom modal */}
-      <AnimatePresence>
-        {hiringCreative && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-brand-bg/80 backdrop-blur-md flex items-center justify-center p-4"
-          >
-            <motion.div 
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className="bg-brand-container border border-white/10 rounded-2xl max-w-md w-full p-6 relative"
-            >
-              <button 
-                onClick={() => setHiringCreative(null)}
-                className="absolute top-4 right-4 text-brand-text-muted hover:text-white transition-colors"
-                aria-label="Close modal"
-              >
-                <Close className="w-6 h-6" />
-              </button>
-
-              <div className="mb-6">
-                <h4 className="font-display text-xl text-white font-bold mb-1">Fund Session</h4>
-                <p className="text-xs text-brand-text-muted">Hire <span className="text-white font-semibold">{hiringCreative.name}</span> instantly. Funds are securely held until you approve the milestones.</p>
-              </div>
-
-              <form onSubmit={handleCreateCustomHire} className="space-y-4 text-xs">
-                <div>
-                  <label className="font-mono text-[9px] text-brand-text-muted uppercase tracking-wider block mb-1.5 font-bold">Session / Project Title</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={hireTitle}
-                    onChange={(e) => setHireTitle(e.target.value)}
-                    placeholder="e.g. Master Vocals for Synth Wave Single"
-                    className="w-full bg-brand-bg border border-white/10 rounded-lg p-2.5 text-xs text-white focus:border-brand-volt focus:outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="font-mono text-[9px] text-brand-text-muted uppercase tracking-wider block mb-1.5 font-bold">Total Budget ($)</label>
-                    <input 
-                      type="number" 
-                      required
-                      value={hireBudget}
-                      onChange={(e) => setHireBudget(e.target.value)}
-                      placeholder="1500"
-                      className="w-full bg-brand-bg border border-white/10 rounded-lg p-2.5 text-xs text-white font-mono focus:border-brand-volt focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-mono text-[9px] text-brand-text-muted uppercase tracking-wider block mb-1.5 font-bold">Milestones Roadmaps</label>
-                    <select
-                      value={hireMilestoneCount}
-                      onChange={(e) => setHireMilestoneCount(e.target.value)}
-                      className="w-full bg-brand-bg border border-white/10 rounded-lg p-2.5 text-xs text-white focus:border-brand-volt focus:outline-none"
-                    >
-                      <option value="1">1 Milestone (100%)</option>
-                      <option value="2">2 Milestones (50/50)</option>
-                      <option value="3">3 Milestones (30/40/30)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="font-mono text-[9px] text-brand-text-muted uppercase tracking-wider block mb-1.5 font-bold">Brief Session Brief & Deliverable Instructions</label>
-                  <textarea 
-                    rows={3}
-                    value={hireDescription}
-                    onChange={(e) => setHireDescription(e.target.value)}
-                    placeholder="Describe exactly what files you expect and details..."
-                    className="w-full bg-brand-bg border border-white/10 rounded-lg p-2.5 text-xs text-white focus:border-brand-volt focus:outline-none resize-none"
-                  />
-                </div>
-
-                {/* Secure warning info */}
-                <div className="bg-brand-volt/5 p-3 rounded-lg border border-brand-volt/10 text-[10px] text-brand-text-muted flex items-start gap-2 leading-relaxed">
-                  <Shield className="w-4 h-4 text-brand-volt flex-shrink-0 mt-0.5" />
-                  <span>
-                    Your payment is held by SideQuests Protected Payments. It is ONLY released to the creative when you approve deliverables inside the OS console.
-                  </span>
-                </div>
-
-                <div className="pt-4 border-t border-white/5 flex justify-end gap-2">
-                  <button 
-                    type="button"
-                    onClick={() => setHiringCreative(null)}
-                    className="px-4 py-2 rounded-lg border border-white/10 text-white hover:bg-white/5 text-xs"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    type="submit"
-                    className="bg-brand-volt text-brand-bg font-sans font-bold px-5 py-2 rounded-lg hover:scale-102 active:scale-95 transition-all text-xs"
-                  >
-                    Fund Session
-                  </button>
-                </div>
-              </form>
 
             </motion.div>
           </motion.div>

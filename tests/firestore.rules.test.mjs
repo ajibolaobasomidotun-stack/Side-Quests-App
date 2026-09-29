@@ -1,6 +1,6 @@
 // Security-rules tests. Run with: npm run test:rules  (needs Java; downloads the Firestore emulator on first run)
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, setDoc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch, addDoc, serverTimestamp } from 'firebase/firestore';
 import fs from 'fs';
 
 const env = await initializeTestEnvironment({
@@ -71,6 +71,65 @@ await t('studio accepts application', () => assertSucceeds(updateDoc(doc(studio,
 await t('applicant cannot withdraw after acceptance', () => assertFails(deleteDoc(doc(artist, 'applications/q1_artist1'))));
 await t('studio marks quest active', () => assertSucceeds(updateDoc(doc(studio, 'quests/q1'), { status: 'active', hiredUid: 'artist1' })));
 await t('cannot apply to a quest that is no longer open', () => assertFails(setDoc(doc(artist2, 'applications/q1_artist2'), app({ applicantUid: 'artist2' }))));
+
+// --- contracts (fresh quest q5 so it's independent of the flow above)
+await env.withSecurityRulesDisabled(async (c) => {
+  const f = c.firestore();
+  await setDoc(doc(f, 'quests/q5'), { ...quest, title: 'Brand shoot' });
+  await setDoc(doc(f, 'applications/q5_artist1'), app({ questId: 'q5' }));
+});
+const contract = {
+  questId: 'q5', questTitle: 'Brand shoot', category: 'Photo & Video',
+  clientUid: 'studio1', clientName: 'Studio One', creativeUid: 'artist1', creativeName: 'Artist One',
+  participants: ['studio1', 'artist1'], totalAmount: 2800, status: 'setup', createdAt: 'x'
+};
+const hireBatch = (f, over = {}) => {
+  const b = writeBatch(f);
+  b.update(doc(f, 'applications/q5_artist1'), { status: 'accepted', updatedAt: 'y' });
+  b.update(doc(f, 'quests/q5'), { status: 'active', hiredUid: 'artist1' });
+  b.set(doc(f, 'contracts/q5_artist1'), { ...contract, ...over });
+  b.set(doc(f, 'contracts/q5_artist1/milestones/m1'), { title: 'Shoot', amount: 1400, order: 0, status: 'pending' });
+  b.set(doc(f, 'contracts/q5_artist1/milestones/m2'), { title: 'Edits', amount: 1400, order: 1, status: 'pending' });
+  return b.commit();
+};
+await t('contract cannot be created without accepting the application', () => assertFails(setDoc(doc(studio, 'contracts/q5_artist1'), contract)));
+await t('creative cannot create a contract', () => assertFails(hireBatch(artist)));
+await t('cannot create contract already active', () => assertFails(hireBatch(studio, { status: 'active' })));
+await t('studio hires: application + quest + contract + milestones in one batch', () => assertSucceeds(hireBatch(studio)));
+await t('outsider cannot read contract', () => assertFails(getDoc(doc(artist2, 'contracts/q5_artist1'))));
+await t('creative reads contract', () => assertSucceeds(getDoc(doc(artist, 'contracts/q5_artist1'))));
+await t('list my contracts', () => assertSucceeds(getDocs(query(collection(artist, 'contracts'), where('participants', 'array-contains', 'artist1')))));
+await t('creative cannot edit plan in setup', () => assertFails(updateDoc(doc(artist, 'contracts/q5_artist1/milestones/m1'), { amount: 99999 })));
+await t('studio edits plan in setup', () => assertSucceeds(updateDoc(doc(studio, 'contracts/q5_artist1/milestones/m1'), { title: 'Shoot day', amount: 1500 })));
+await t('studio adds milestone in setup', () => assertSucceeds(setDoc(doc(studio, 'contracts/q5_artist1/milestones/m3'), { title: 'Extras', amount: 100, order: 2, status: 'pending' })));
+await t('studio cannot add pre-approved milestone', () => assertFails(setDoc(doc(studio, 'contracts/q5_artist1/milestones/m4'), { title: 'X', amount: 1, order: 3, status: 'approved' })));
+await t('studio deletes milestone in setup', () => assertSucceeds(deleteDoc(doc(studio, 'contracts/q5_artist1/milestones/m3'))));
+await t('creative cannot submit work before contract is active', () => assertFails(updateDoc(doc(artist, 'contracts/q5_artist1/milestones/m1'), { status: 'submitted', submissionNote: '', submittedAt: 'z' })));
+await t('creative cannot accept terms still in setup', () => assertFails(updateDoc(doc(artist, 'contracts/q5_artist1'), { status: 'active', updatedAt: 'z' })));
+await t('studio proposes terms', () => assertSucceeds(updateDoc(doc(studio, 'contracts/q5_artist1'), { status: 'proposed', updatedAt: 'z' })));
+await t('studio cannot edit plan once proposed', () => assertFails(updateDoc(doc(studio, 'contracts/q5_artist1/milestones/m1'), { amount: 1 })));
+await t('studio cannot self-accept', () => assertFails(updateDoc(doc(studio, 'contracts/q5_artist1'), { status: 'active', updatedAt: 'z' })));
+await t('creative asks for changes', () => assertSucceeds(updateDoc(doc(artist, 'contracts/q5_artist1'), { status: 'setup', changeRequest: 'Can we split edits into two?', updatedAt: 'z' })));
+await t('studio re-proposes', () => assertSucceeds(updateDoc(doc(studio, 'contracts/q5_artist1'), { status: 'proposed', changeRequest: '', updatedAt: 'z' })));
+await t('creative accepts', () => assertSucceeds(updateDoc(doc(artist, 'contracts/q5_artist1'), { status: 'active', updatedAt: 'z' })));
+await t('nobody can change the total once active', () => assertFails(updateDoc(doc(studio, 'contracts/q5_artist1'), { totalAmount: 1, updatedAt: 'z' })));
+await t('studio cannot approve unsubmitted milestone', () => assertFails(updateDoc(doc(studio, 'contracts/q5_artist1/milestones/m1'), { status: 'approved', feedback: '', reviewedAt: 'z' })));
+await t('creative cannot approve own milestone', () => assertFails(updateDoc(doc(artist, 'contracts/q5_artist1/milestones/m1'), { status: 'approved', feedback: '', reviewedAt: 'z' })));
+await t('creative submits milestone', () => assertSucceeds(updateDoc(doc(artist, 'contracts/q5_artist1/milestones/m1'), { status: 'submitted', submissionNote: 'Selects attached', submittedAt: 'z' })));
+await t('studio requests changes', () => assertSucceeds(updateDoc(doc(studio, 'contracts/q5_artist1/milestones/m1'), { status: 'changes_requested', feedback: 'Brighter please', reviewedAt: 'z' })));
+await t('creative resubmits', () => assertSucceeds(updateDoc(doc(artist, 'contracts/q5_artist1/milestones/m1'), { status: 'submitted', submissionNote: 'Brighter now', submittedAt: 'z2' })));
+await t('studio approves', () => assertSucceeds(updateDoc(doc(studio, 'contracts/q5_artist1/milestones/m1'), { status: 'approved', feedback: 'Great', reviewedAt: 'z2' })));
+await t('creative cannot cancel an active contract', () => assertFails(updateDoc(doc(artist, 'contracts/q5_artist1'), { status: 'cancelled', updatedAt: 'z' })));
+await t('creative cannot complete contract', () => assertFails(updateDoc(doc(artist, 'contracts/q5_artist1'), { status: 'completed', updatedAt: 'z' })));
+// messages
+await t('participant sends a message', () => assertSucceeds(addDoc(collection(artist, 'contracts/q5_artist1/messages'), { senderUid: 'artist1', senderName: 'A', type: 'text', text: 'hi', createdAt: serverTimestamp() })));
+await t('cannot send as someone else', () => assertFails(addDoc(collection(artist, 'contracts/q5_artist1/messages'), { senderUid: 'studio1', senderName: 'S', type: 'text', text: 'hi', createdAt: serverTimestamp() })));
+await t('outsider cannot send', () => assertFails(addDoc(collection(artist2, 'contracts/q5_artist1/messages'), { senderUid: 'artist2', senderName: 'X', type: 'text', text: 'hi', createdAt: serverTimestamp() })));
+await t('file message must point into own folder', () => assertFails(addDoc(collection(artist, 'contracts/q5_artist1/messages'), { senderUid: 'artist1', senderName: 'A', type: 'file', text: 'x', file: { name: 'x', size: 1, contentType: 'a', path: 'contracts/q5_artist1/studio1/x' }, createdAt: serverTimestamp() })));
+await t('file message in own folder ok', () => assertSucceeds(addDoc(collection(artist, 'contracts/q5_artist1/messages'), { senderUid: 'artist1', senderName: 'A', type: 'file', text: 'x', file: { name: 'x', size: 1, contentType: 'a', path: 'contracts/q5_artist1/artist1/1_x' }, createdAt: serverTimestamp() })));
+await t('outsider cannot read messages', () => assertFails(getDocs(collection(artist2, 'contracts/q5_artist1/messages'))));
+await t('chat preview update allowed', () => assertSucceeds(updateDoc(doc(artist, 'contracts/q5_artist1'), { lastMessageAt: 'z', lastMessagePreview: 'hi', lastMessageBy: 'artist1' })));
+await t('studio completes contract', () => assertSucceeds(updateDoc(doc(studio, 'contracts/q5_artist1'), { status: 'completed', updatedAt: 'z' })));
 
 // --- bookmarks
 await t('save a bookmark', () => assertSucceeds(setDoc(doc(artist, 'bookmarks/artist1_q1'), { userId: 'artist1', questId: 'q1', createdAt: 'x' })));

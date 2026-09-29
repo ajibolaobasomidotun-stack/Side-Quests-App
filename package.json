@@ -11,7 +11,8 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test:rules": "firebase emulators:exec --only firestore --project demo-sidequests \"node tests/firestore.rules.test.mjs\"",
-    "deploy:rules": "firebase deploy --only firestore:rules"
+    "deploy:rules": "firebase deploy --only firestore:rules",
+    "deploy": "npm run build && firebase deploy --only hosting,firestore:rules,storage"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

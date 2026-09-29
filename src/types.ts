@@ -161,3 +161,69 @@ export interface UserProfile {
   createdAt: string;
 }
 
+
+// ---------------------------------------------------------------------------
+// Contracts (created when a gig provider hires a creative)
+// ---------------------------------------------------------------------------
+
+/**
+ * setup     – gig provider is editing the milestones
+ * proposed  – terms sent, waiting for the creative to accept
+ * active    – work in progress
+ * completed – every milestone approved
+ * cancelled – called off before work started
+ */
+export type ContractStatus = 'setup' | 'proposed' | 'active' | 'completed' | 'cancelled';
+
+export interface Contract {
+  id: string;
+  questId: string;
+  questTitle: string;
+  category: string;
+  clientUid: string;
+  clientName: string;
+  clientAvatar?: string;
+  creativeUid: string;
+  creativeName: string;
+  creativeAvatar?: string;
+  participants: string[];
+  totalAmount: number;
+  status: ContractStatus;
+  changeRequest?: string;
+  createdAt: string;
+  updatedAt?: string;
+  lastMessageAt?: string;
+  lastMessagePreview?: string;
+  lastMessageBy?: string;
+}
+
+export type MilestoneStatus = 'pending' | 'submitted' | 'changes_requested' | 'approved';
+
+export interface Milestone {
+  id: string;
+  title: string;
+  amount: number;
+  order: number;
+  status: MilestoneStatus;
+  submissionNote?: string;
+  submittedAt?: string;
+  feedback?: string;
+  reviewedAt?: string;
+}
+
+export interface ContractFile {
+  name: string;
+  size: number;
+  contentType: string;
+  path: string;
+}
+
+export interface ContractMessage {
+  id: string;
+  senderUid: string;
+  senderName: string;
+  type: 'text' | 'file' | 'system';
+  text: string;
+  file?: ContractFile;
+  createdAt: Date | null;
+}
