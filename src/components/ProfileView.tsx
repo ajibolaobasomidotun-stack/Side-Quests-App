@@ -116,7 +116,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   {profile.accountType === 'artist' ? 'Artist / Talent' : 'Gig Provider / Client'}
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-white/5 text-brand-text-muted border border-white/10 text-xs font-mono">
-                  Verified Escrow ID
+                  Protected Payments ID
                 </span>
               </div>
               <div className="text-xs text-brand-volt font-mono font-medium">{profile.handle}</div>
@@ -207,7 +207,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
 
           <div className="bg-brand-container-high/60 border border-white/5 p-3.5 rounded-xl">
-            <div className="text-[10px] font-mono text-brand-text-muted uppercase">Escrow Rating</div>
+            <div className="text-[10px] font-mono text-brand-text-muted uppercase">Payment Rating</div>
             <div className="text-lg font-bold text-brand-volt font-mono mt-0.5 flex items-center gap-1">
               5.0 <Star className="w-4 h-4 text-brand-volt inline" />
             </div>
@@ -228,7 +228,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <div className="text-[10px] font-mono text-brand-text-muted uppercase">Security Status</div>
             <div className="text-xs font-bold text-brand-volt font-mono mt-1 flex items-center gap-1">
               <VerifiedUser className="w-3.5 h-3.5" />
-              100% Escrow Guarded
+              100% Payment Protected
             </div>
           </div>
         </div>
@@ -469,7 +469,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     Verified Talent Matching Your Hiring Categories
                   </h3>
                   <p className="text-xs text-brand-text-muted">
-                    Vetted audio engineers and touring musicians ready for instant escrow contracts.
+                    Vetted audio engineers and touring musicians ready for instant Protected Payments contracts.
                   </p>
                 </div>
                 <button

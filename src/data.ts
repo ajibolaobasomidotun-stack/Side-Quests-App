@@ -291,17 +291,17 @@ export const LEARN_ARTICLES: Article[] = [
   },
   {
     id: 'a3',
-    title: 'Drafting Clear Smart Escrow Gigs: A Guide',
+    title: 'Drafting Clear Milestone Gigs: A Guide',
     category: 'Business',
     readTime: '6 min read',
     author: 'SideQuests Legal',
     authorRole: 'Protocol Team',
     summary: 'Protect your creative independence and secure your session funds prior to recording a single track.',
     content: [
-      'The biggest bottleneck for freelance session producers is chasing down payments. SideQuests solves this with smart-contract escrow, but success starts with how you write your contract milestones.',
+      'The biggest bottleneck for freelance session producers is chasing down payments. SideQuests solves this with Protected Payments, but success starts with how you write your contract milestones.',
       'Never agree to a contract with a single, massive 100% payout at the very end. This leads to scope creep, unlimited revision requests, and financial vulnerability.',
-      'Instead, break your gig into 3 clear, objective milestones: 1) Rhythm/Concept Phase (30% escrow release), 2) Arrangement/Tracking Pass (40% escrow release), 3) Final Deliverables & Stems (30% escrow release).',
-      'By securing funds in escrow before laying down the first chord, you can focus on the art knowing the financial infrastructure is locked.'
+      'Instead, break your gig into 3 clear, objective milestones: 1) Rhythm/Concept Phase (30% payment release), 2) Arrangement/Tracking Pass (40% payment release), 3) Final Deliverables & Stems (30% payment release).',
+      'By having the studio pay up front before you lay down the first chord, you can focus on the art knowing the financial infrastructure is locked.'
     ],
     image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuADdQ0rH3ghpBis9Juqesk8fd5Ij1NY52kSoHoDzL1JfZ-4laaASkQkkk-EXr077OP1sxn_ck29BZ4rf-jqvTuWZSt4k9AAGBcbS_cQ3c8xDl-ga6UlAI5dL8MSCCf3hVJMCzZtZmU2xQOkfNHegYgdJsygzPCgk9Abu3v7_Z9JENx7pGv9w_SSJz2GakCerDAXLKktSJnssHyWMuGi_ZRGQLFK-E93Qo77eWbeZh9L7Q1ctvZHmvRfP-1mkPcm2D73YA'
   }

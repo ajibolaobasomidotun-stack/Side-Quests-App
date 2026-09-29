@@ -100,10 +100,10 @@ export const PostQuestModal: React.FC<PostQuestModalProps> = ({
               Gig Provider Portal
             </span>
             <h3 className="text-2xl font-bold text-white font-display mt-1">
-              Post a New Escrow Quest
+              Post a New Quest
             </h3>
             <p className="text-xs text-brand-text-muted mt-1">
-              Publish a verified contract to the SideQuests network with automated escrow protection.
+              Publish a verified contract to the SideQuests network with Protected Payments.
             </p>
           </div>
 
@@ -140,7 +140,7 @@ export const PostQuestModal: React.FC<PostQuestModalProps> = ({
 
               <div>
                 <label className="block text-xs font-mono uppercase tracking-wider text-brand-text-muted mb-2 font-semibold">
-                  Escrow Budget ($ USD) *
+                  Budget ($ USD) *
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-3 text-brand-text-muted text-sm">$</span>
@@ -226,11 +226,11 @@ export const PostQuestModal: React.FC<PostQuestModalProps> = ({
               </div>
             </div>
 
-            {/* Escrow Guarantee Notice */}
+            {/* Protected Payments Notice */}
             <div className="bg-brand-volt/5 border border-brand-volt/20 rounded-xl p-3.5 flex items-center gap-3">
               <VerifiedUser className="w-5 h-5 text-brand-volt flex-shrink-0" />
               <div className="text-xs text-brand-text-muted">
-                <span className="text-white font-semibold">Smart-Contract Escrow:</span> The ${parseFloat(budget || '0').toLocaleString()} budget will be funded into secure escrow upon applicant selection.
+                <span className="text-white font-semibold">Protected Payments:</span> The ${parseFloat(budget || '0').toLocaleString()} budget is paid up front when you select an applicant and released milestone by milestone.
               </div>
             </div>
 

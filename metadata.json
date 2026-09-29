@@ -1,6 +1,6 @@
 {
   "name": "SideQuests",
-  "description": "The professional network and operating system for the global creative economy. Connecting world-class creatives with escrow-protected gig opportunities.",
+  "description": "The professional network and operating system for the global creative economy. Connecting world-class creatives with payment-protected gig opportunities.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

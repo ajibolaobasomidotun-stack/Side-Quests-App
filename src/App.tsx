@@ -80,7 +80,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   const [userBookmarks, setUserBookmarks] = useState<string[]>([]);
-  const [serverStatus, setServerStatus] = useState<{ status: string; totalEscrow?: string } | null>(null);
+  const [serverStatus, setServerStatus] = useState<{ status: string } | null>(null);
 
   // User Profile state
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
@@ -149,10 +149,7 @@ export default function App() {
       .then(res => res.json())
       .then(data => {
         if (data.status === 'ok') {
-          fetch('/api/stats')
-            .then(res => res.json())
-            .then(stats => setServerStatus({ status: 'Operational', totalEscrow: stats.totalSecuredEscrow }))
-            .catch(() => setServerStatus({ status: 'Operational' }));
+          setServerStatus({ status: 'Operational' });
         }
       })
       .catch(() => {
@@ -220,8 +217,8 @@ export default function App() {
             category: rq.category || 'Production',
             budget: typeof rq.budget === 'number' ? rq.budget : parseInt(String(rq.budget).replace(/[^0-9]/g, '')) || 2500,
             deadline: rq.deadline || 'Flexible',
-            description: rq.description || 'Escrow protected gig opportunity.',
-            requirements: rq.tags || ['Verified Escrow', 'Direct Payout'],
+            description: rq.description || 'Payment-protected gig opportunity.',
+            requirements: rq.tags || ['Protected Payments', 'Direct Payout'],
             milestones: [
               { id: 'm1', title: 'Phase 1 - Delivery & Review', amount: Math.round((typeof rq.budget === 'number' ? rq.budget : 2500) * 0.5), status: 'escrowed' },
               { id: 'm2', title: 'Phase 2 - Final Sign-off', amount: Math.round((typeof rq.budget === 'number' ? rq.budget : 2500) * 0.5), status: 'escrowed' }
@@ -384,7 +381,7 @@ export default function App() {
 
   const handleAddNewQuest = async (newQuest: Quest) => {
     setQuests(prev => [newQuest, ...prev]);
-    showToast(`Quest "${newQuest.title}" posted to the SideQuests network! Escrow ready.`, 'success');
+    showToast(`Quest "${newQuest.title}" posted to the SideQuests network! Protected Payments ready.`, 'success');
 
     // Persist quest to Firestore
     if (currentUser) {
@@ -426,7 +423,7 @@ export default function App() {
           applicantUid: currentUser.uid,
           applicantName: userProfile.displayName,
           applicantAvatar: userProfile.avatarUrl,
-          proposalText: `Verified creative application for "${quest.title}". All deliverables will be protected via smart escrow milestones.`,
+          proposalText: `Verified creative application for "${quest.title}". All deliverables will be covered by Protected Payments milestones.`,
           bidAmount: `$${quest.budget.toLocaleString()}`
         });
       } catch (err) {
@@ -458,7 +455,7 @@ export default function App() {
         {
           id: `msg_${Date.now()}_1`,
           sender: 'client',
-          text: `Hi Elena! Thanks for applying to "${quest.title}". We’ve approved your application and fully funded the smart-contract escrow of $${quest.budget.toLocaleString()}. Welcome aboard!`,
+          text: `Hi Elena! Thanks for applying to "${quest.title}". We’ve approved your application and fully funded the Protected Payment of $${quest.budget.toLocaleString()}. Welcome aboard!`,
           time: 'Just now'
         },
         {
@@ -474,7 +471,7 @@ export default function App() {
     setTasks(prev => [newTask, ...prev]);
     setActiveTaskId(newTask.id);
     setTaskViewRole('artist');
-    showToast(`Application submitted! $${quest.budget.toLocaleString()} locked in escrow!`, 'success');
+    showToast(`Application submitted! $${quest.budget.toLocaleString()} secured with Protected Payments!`, 'success');
     
     // Smooth transition to Tasks tab
     setActiveTab('tasks');
@@ -515,7 +512,7 @@ export default function App() {
         {
           id: `m_c_1`,
           sender: 'client',
-          text: `Hey ${hiringCreative.name}! I’ve set up a custom session: "${hireTitle || `Direct Session`}" and deposited $${totalBudget.toLocaleString()} directly into the SideQuests trust escrow. Ready when you are!`,
+          text: `Hey ${hiringCreative.name}! I’ve set up a custom session: "${hireTitle || `Direct Session`}" and funded $${totalBudget.toLocaleString()} through SideQuests Protected Payments. Ready when you are!`,
           time: 'Just now'
         }
       ],
@@ -534,7 +531,7 @@ export default function App() {
     setHireDescription('');
     setHireMilestoneCount('2');
 
-    showToast(`Escrow session funded! $${totalBudget.toLocaleString()} secured.`, 'success');
+    showToast(`Session funded! $${totalBudget.toLocaleString()} secured.`, 'success');
     setActiveTab('tasks');
   };
 
@@ -572,7 +569,7 @@ export default function App() {
       
       const responseText = counterparty === 'artist' 
         ? `Thanks! Got your message. I am tracking this in my DAW right now and will upload a progress stem shortly.`
-        : `Got it! Let’s keep pushing on these milestones. The escrow balance looks good on my end. Cheers!`;
+        : `Got it! Let’s keep pushing on these milestones. The protected balance looks good on my end. Cheers!`;
 
       const autoMsg = {
         id: `msg_auto_${Date.now()}`,
@@ -683,7 +680,7 @@ export default function App() {
       return t;
     }));
 
-    showToast('Escrow funds released to Artist successfully!', 'success');
+    showToast('Milestone payment released to Artist!', 'success');
   };
 
   const scrollToQuests = () => {
@@ -751,17 +748,16 @@ export default function App() {
             <button className={`hover:text-brand-volt transition-colors ${activeTab === 'quests' ? 'text-brand-volt' : ''}`} onClick={() => setActiveTab('quests')}>Ecosystem</button>
             <button className={`hover:text-brand-volt transition-colors ${activeTab === 'creatives' ? 'text-brand-volt' : ''}`} onClick={() => setActiveTab('creatives')}>Creatives</button>
             <button className={`hover:text-brand-volt transition-colors ${activeTab === 'learn' ? 'text-brand-volt' : ''}`} onClick={() => setActiveTab('learn')}>Academy</button>
-            <button className={`hover:text-brand-volt transition-colors ${activeTab === 'pricing' ? 'text-brand-volt' : ''}`} onClick={() => setActiveTab('pricing')}>Escrow Trust</button>
+            <button className={`hover:text-brand-volt transition-colors ${activeTab === 'pricing' ? 'text-brand-volt' : ''}`} onClick={() => setActiveTab('pricing')}>Payment Protection</button>
             <button className={`hover:text-brand-volt transition-colors ${activeTab === 'tasks' ? 'text-brand-volt' : ''}`} onClick={() => setActiveTab('tasks')}>OS Console</button>
             <button className={`hover:text-brand-volt transition-colors ${activeTab === 'profile' ? 'text-brand-volt font-bold' : ''}`} onClick={() => { setActiveTab('profile'); setIsEditingProfile(false); }}>Profile</button>
           </div>
 
-          {/* Backend / Escrow Server Status Pill */}
+          {/* Backend Server Status Pill */}
           {serverStatus && (
             <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-volt/5 border border-brand-volt/20 text-brand-volt font-mono text-[9px] uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-brand-volt animate-ping" />
               <span>Full-Stack Live</span>
-              {serverStatus.totalEscrow && <span className="text-white/60">({serverStatus.totalEscrow})</span>}
             </div>
           )}
 
@@ -846,7 +842,7 @@ export default function App() {
                     The Operating System for the Modern <span className="text-brand-volt text-glow italic font-normal font-display block sm:inline">Creative Gig Economy</span>
                   </h2>
                   <p className="text-lg md:text-xl text-brand-text-muted mb-10 leading-relaxed font-sans max-w-xl">
-                    Connecting world-class creatives with escrow-protected gig opportunities.
+                    Connecting world-class creatives with payment-protected gig opportunities.
                   </p>
                   <div className="flex flex-col sm:flex-row flex-wrap gap-3">
                     <button 
@@ -912,7 +908,7 @@ export default function App() {
                     <div>
                       <h4 className="font-display text-xl md:text-2xl text-white mb-2 font-semibold">Reliable payments</h4>
                       <p className="text-brand-text-muted text-sm leading-relaxed">
-                        Never chase an invoice again. Smart-contract escrow ensures your funds are secured and verified before you even boot your DAW or step on stage.
+                        Never chase an invoice again. With Protected Payments, the studio pays before you even boot your DAW or step on stage.
                       </p>
                     </div>
                   </div>
@@ -995,7 +991,7 @@ export default function App() {
                     <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mb-6 border border-white/10">
                       <Shield className="w-6 h-6 text-brand-volt" />
                     </div>
-                    <h4 className="font-display text-lg text-white font-semibold mb-3">Escrow-protected payments</h4>
+                    <h4 className="font-display text-lg text-white font-semibold mb-3">Protected payments</h4>
                     <p className="text-brand-text-muted text-xs leading-relaxed max-w-xs">
                       Funds are only released upon your explicit milestone approval. Absolute security for high-budget productions and sensitive intellectual property.
                     </p>
@@ -1099,7 +1095,7 @@ export default function App() {
                 <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
                     <h3 className="font-display text-3xl text-white font-semibold">Active Quests</h3>
-                    <p className="text-brand-text-muted text-sm mt-1">Funded escrow contracts accepting applications</p>
+                    <p className="text-brand-text-muted text-sm mt-1">Funded, payment-protected gigs accepting applications</p>
                   </div>
                   
                   {/* Category filters */}
@@ -1207,7 +1203,7 @@ export default function App() {
                               }`}
                               disabled={quest.applied}
                             >
-                              {quest.applied ? 'Applied' : 'Apply & Secure Escrow'}
+                              {quest.applied ? 'Applied' : 'Apply'}
                             </button>
                           </div>
                         </div>
@@ -1236,9 +1232,9 @@ export default function App() {
                     <div className="flex gap-4">
                       <span className="text-3xl flex-shrink-0 mt-1"><LockOpen className="w-8 h-8 text-brand-bg" /></span>
                       <div>
-                        <h4 className="font-sans font-bold text-lg uppercase tracking-tight mb-2">Escrow Payments</h4>
+                        <h4 className="font-sans font-bold text-lg uppercase tracking-tight mb-2">Protected Payments</h4>
                         <p className="text-sm font-medium text-brand-bg/80 leading-relaxed">
-                          Our proprietary escrow system holds client funds securely in trust until both parties confirm milestone completion, completely eliminating non-payment risks.
+                          With Protected Payments, the studio pays up front and the money is only released to the creative when each milestone is approved, so nobody is left chasing an invoice.
                         </p>
                       </div>
                     </div>
@@ -1248,7 +1244,7 @@ export default function App() {
                       <div>
                         <h4 className="font-sans font-bold text-lg uppercase tracking-tight mb-2">Transparent Pricing</h4>
                         <p className="text-sm font-medium text-brand-bg/80 leading-relaxed">
-                          Flat, straightforward platform escrow fees and zero hidden charges. You see exactly what the talent earns and exactly what the studio pays.
+                          Flat, straightforward platform fees and zero hidden charges. You see exactly what the talent earns and exactly what the studio pays.
                         </p>
                       </div>
                     </div>
@@ -1396,7 +1392,7 @@ export default function App() {
                           }}
                           className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-4 py-2.5 rounded-lg hover:scale-[1.03] active:scale-95 transition-all"
                         >
-                          Hire & Lock Escrow
+                          Hire & Fund
                         </button>
                       </div>
                     </div>
@@ -1482,11 +1478,11 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* PRICING & ESCROW FEES VIEW */}
+          {/* PRICING & FEES VIEW */}
           {activeTab === 'pricing' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-10">
               <div className="mb-12 max-w-xl">
-                <h3 className="font-display text-3xl md:text-4xl text-white font-semibold">Platform & Escrow Tiers</h3>
+                <h3 className="font-display text-3xl md:text-4xl text-white font-semibold">Platform Fees & Tiers</h3>
                 <p className="text-brand-text-muted text-sm mt-1">SideQuests keeps flat rates with absolute payment security. Choose your career speed.</p>
               </div>
 
@@ -1497,9 +1493,9 @@ export default function App() {
                 <div className="bg-brand-container border border-white/5 p-8 rounded-2xl flex flex-col justify-between">
                   <div>
                     <span className="font-mono text-xs text-brand-text-muted uppercase tracking-wider">CREATOR BASE</span>
-                    <h4 className="font-display text-3xl text-white font-bold mt-1 mb-4">Flat Escrow Fee</h4>
+                    <h4 className="font-display text-3xl text-white font-bold mt-1 mb-4">Flat Platform Fee</h4>
                     <p className="text-sm text-brand-text-muted leading-relaxed mb-6">
-                      For independent session artists, MDs, and engineers looking to secure payments using the SideQuests trust protocol.
+                      For independent session artists, MDs, and engineers looking to secure payments using SideQuests Protected Payments.
                     </p>
                     
                     <div className="flex items-baseline gap-1 mb-8">
@@ -1510,7 +1506,7 @@ export default function App() {
                     <ul className="space-y-3.5 mb-8 border-t border-white/5 pt-6">
                       <li className="text-xs text-brand-text-muted flex items-center gap-2">
                         <Verified className="w-4 h-4 text-brand-volt flex-shrink-0" />
-                        <span>Secure smart-contract escrow locks</span>
+                        <span>Protected Payments on every milestone</span>
                       </li>
                       <li className="text-xs text-brand-text-muted flex items-center gap-2">
                         <Verified className="w-4 h-4 text-brand-volt flex-shrink-0" />
@@ -1551,7 +1547,7 @@ export default function App() {
                     <ul className="space-y-3.5 mb-8 border-t border-white/5 pt-6">
                       <li className="text-xs text-white flex items-center gap-2">
                         <Verified className="w-4 h-4 text-brand-volt flex-shrink-0" />
-                        <span className="font-medium">1.8% reduced escrow transaction fee</span>
+                        <span className="font-medium">1.8% reduced transaction fee</span>
                       </li>
                       <li className="text-xs text-white flex items-center gap-2">
                         <Verified className="w-4 h-4 text-brand-volt flex-shrink-0" />
@@ -1578,9 +1574,9 @@ export default function App() {
 
               </div>
 
-              {/* Escrow Budget Calculator */}
+              {/* Fee Calculator */}
               <div className="bg-brand-container border border-white/5 p-8 rounded-2xl max-w-2xl mx-auto">
-                <h4 className="font-display text-xl text-white font-bold mb-2">Escrow Fee Estimator</h4>
+                <h4 className="font-display text-xl text-white font-bold mb-2">Platform Fee Estimator</h4>
                 <p className="text-xs text-brand-text-muted leading-relaxed mb-6">
                   Input your projected music production gig budget to view the standard SideQuests trust protection fee and compare layouts.
                 </p>
@@ -1731,17 +1727,17 @@ export default function App() {
                     {/* Header summary info */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-white/5 mb-6">
                       <div>
-                        <span className="font-mono text-[9px] text-brand-volt uppercase tracking-wider block mb-1">TRUST ESCROW REGISTERED</span>
+                        <span className="font-mono text-[9px] text-brand-volt uppercase tracking-wider block mb-1">PROTECTED PAYMENT ACTIVE</span>
                         <h4 className="font-display text-xl text-white font-bold leading-tight">{activeTask.questTitle}</h4>
                         <p className="text-xs text-brand-text-muted mt-1">
                           {activeTask.role === 'artist' ? `Contract with ${activeTask.clientName}` : `Contracting ${activeTask.artistName}`}
                         </p>
                       </div>
 
-                      {/* Escrow specs */}
+                      {/* Payment specs */}
                       <div className="flex gap-4 bg-brand-bg border border-white/5 p-3 rounded-xl font-mono text-[11px]">
                         <div>
-                          <span className="text-brand-text-muted block">Locked in Escrow</span>
+                          <span className="text-brand-text-muted block">Protected Balance</span>
                           <span className="text-brand-volt font-bold text-sm">${activeTask.escrowBalance.toLocaleString()}</span>
                         </div>
                         <div className="w-px bg-white/10"></div>
@@ -1792,7 +1788,7 @@ export default function App() {
                                     <span className={
                                       isReleased ? 'text-emerald-400' : isSubmitted ? 'text-blue-400' : 'text-brand-volt'
                                     }>
-                                      {isReleased ? 'RELEASED' : isSubmitted ? 'SUBMITTED / PENDING' : 'SECURED IN ESCROW'}
+                                      {isReleased ? 'RELEASED' : isSubmitted ? 'SUBMITTED / PENDING' : 'FUNDED'}
                                     </span>
                                   </span>
 
@@ -1969,7 +1965,7 @@ export default function App() {
                     <Checklist className="w-12 h-12 text-brand-text-muted mx-auto mb-4" />
                     <h4 className="text-lg text-white font-bold font-display mb-2">No Active Contract Selected</h4>
                     <p className="text-xs text-brand-text-muted max-w-sm mx-auto mb-6">
-                      Toggle roles above or select one of your ongoing smart-contract gigs on the left to review tracks, write messages, and release escrow milestones.
+                      Toggle roles above or select one of your ongoing gigs on the left to review tracks, write messages, and release milestone payments.
                     </p>
                     {taskViewRole === 'artist' ? (
                       <button onClick={() => scrollToQuests()} className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-6 py-3 rounded-xl hover:scale-105 transition-all">
@@ -2050,7 +2046,7 @@ export default function App() {
             <h5 className="font-mono text-[10px] text-white uppercase tracking-widest mb-4 font-semibold">Company</h5>
             <ul className="space-y-2 text-xs text-brand-text-muted">
               <li><button onClick={() => showToast('About SideQuests: Vetted gig networks for audio.', 'info')} className="hover:text-brand-volt transition-colors">About Us</button></li>
-              <li><button onClick={() => showToast('Trust protocol and active secure escrow.', 'info')} className="hover:text-brand-volt transition-colors">Trust & Safety</button></li>
+              <li><button onClick={() => showToast('Protected Payments and verified profiles.', 'info')} className="hover:text-brand-volt transition-colors">Trust & Safety</button></li>
               <li><button onClick={() => showToast('GDPR Compliant Privacy Terms.', 'info')} className="hover:text-brand-volt transition-colors">Privacy Policy</button></li>
               <li><button onClick={() => showToast('Terms of Service and Dispute resolution rules.', 'info')} className="hover:text-brand-volt transition-colors">Terms of Service</button></li>
             </ul>
@@ -2318,7 +2314,7 @@ export default function App() {
                 </div>
 
                 <div>
-                  <span className="font-mono text-[9px] text-brand-volt uppercase tracking-wider block mb-2">ROADMAP MILESTONES (ESCROW SECURED)</span>
+                  <span className="font-mono text-[9px] text-brand-volt uppercase tracking-wider block mb-2">ROADMAP MILESTONES (FUNDED)</span>
                   <div className="space-y-2">
                     {selectedQuest.milestones.map((milestone, idx) => (
                       <div key={idx} className="bg-brand-bg p-3 rounded-lg border border-white/5 flex justify-between items-center text-[11px]">
@@ -2349,7 +2345,7 @@ export default function App() {
                   }`}
                   disabled={selectedQuest.applied}
                 >
-                  {selectedQuest.applied ? 'Applied' : 'Apply & Fund Escrow'}
+                  {selectedQuest.applied ? 'Applied' : 'Apply'}
                 </button>
               </div>
 
@@ -2419,7 +2415,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Hire & Lock Escrow custom modal */}
+      {/* Hire & Fund custom modal */}
       <AnimatePresence>
         {hiringCreative && (
           <motion.div 
@@ -2443,7 +2439,7 @@ export default function App() {
               </button>
 
               <div className="mb-6">
-                <h4 className="font-display text-xl text-white font-bold mb-1">Fund Escrow Session</h4>
+                <h4 className="font-display text-xl text-white font-bold mb-1">Fund Session</h4>
                 <p className="text-xs text-brand-text-muted">Hire <span className="text-white font-semibold">{hiringCreative.name}</span> instantly. Funds are securely held until you approve the milestones.</p>
               </div>
 
@@ -2502,7 +2498,7 @@ export default function App() {
                 <div className="bg-brand-volt/5 p-3 rounded-lg border border-brand-volt/10 text-[10px] text-brand-text-muted flex items-start gap-2 leading-relaxed">
                   <Shield className="w-4 h-4 text-brand-volt flex-shrink-0 mt-0.5" />
                   <span>
-                    Securing funds deposits them in the SideQuests secure trust escrow locker. Funds will ONLY be released when you approve deliverables inside the OS console.
+                    Your payment is held by SideQuests Protected Payments. It is ONLY released to the creative when you approve deliverables inside the OS console.
                   </span>
                 </div>
 
@@ -2518,7 +2514,7 @@ export default function App() {
                     type="submit"
                     className="bg-brand-volt text-brand-bg font-sans font-bold px-5 py-2 rounded-lg hover:scale-102 active:scale-95 transition-all text-xs"
                   >
-                    Deposit & Lock Escrow
+                    Fund Session
                   </button>
                 </div>
               </form>

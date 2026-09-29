@@ -252,7 +252,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
             <span className="px-2.5 py-0.5 rounded-full bg-brand-volt/10 text-brand-volt border border-brand-volt/20 text-xs font-mono font-medium tracking-wider uppercase">
               Onboarding & Credentials
             </span>
-            <span className="text-brand-text-muted text-xs font-mono">• Smart-Contract Escrow Ready</span>
+            <span className="text-brand-text-muted text-xs font-mono">• Protected Payments Ready</span>
           </div>
           <h2 className="text-3xl md:text-4xl font-display font-bold text-white tracking-tight">
             Create Your <span className="text-brand-volt italic font-normal">SideQuests Profile</span>
@@ -338,7 +338,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                   )}
                 </div>
                 <p className="text-xs text-brand-text-muted leading-relaxed">
-                  Apply to verified quests, get hired directly by major record labels and tour managers, and earn protected funds via milestone escrow.
+                  Apply to verified quests, get hired directly by major record labels and tour managers, and get paid milestone by milestone with Protected Payments.
                 </p>
               </div>
 
@@ -370,7 +370,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                   )}
                 </div>
                 <p className="text-xs text-brand-text-muted leading-relaxed">
-                  Post high-stakes quests, discover vetted audio veterans, manage contract milestones, and protect your budget with smart escrow lock.
+                  Post high-stakes quests, discover vetted audio veterans, manage contract milestones, and protect your budget with Protected Payments.
                 </p>
               </div>
             </div>
@@ -771,7 +771,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
               {accountType === 'provider' && (
                 <div className="bg-brand-container-low border border-white/10 rounded-2xl p-6 md:p-8 space-y-6">
                   <h3 className="text-base font-bold text-white font-display border-b border-white/10 pb-3">
-                    Gig Provider & Escrow Preferences
+                    Gig Provider & Payment Preferences
                   </h3>
 
                   <div>
@@ -847,10 +847,10 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                     <VerifiedUser className="w-5 h-5 text-brand-volt flex-shrink-0 mt-0.5" />
                     <div>
                       <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">
-                        Smart-Contract Escrow Protection Enabled
+                        Protected Payments Enabled
                       </h4>
                       <p className="text-xs text-brand-text-muted mt-1 leading-relaxed">
-                        Gig providers fund milestones into audited digital escrow contracts. Funds are only released when audio stems and deliverables meet contractual specifications.
+                        Gig providers pay for milestones up front with Protected Payments. Funds are only released when audio stems and deliverables meet contractual specifications.
                       </p>
                     </div>
                   </div>
@@ -1108,7 +1108,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
               {/* Card Footer Actions */}
               <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-3">
                 <span className="text-[10px] font-mono text-brand-text-muted uppercase">
-                  Audited ID: {currentProfile.id || 'SQ-PRO-2026'} • 100% Escrow Protected
+                  Audited ID: {currentProfile.id || 'SQ-PRO-2026'} • 100% Payment Protected
                 </span>
 
                 <button

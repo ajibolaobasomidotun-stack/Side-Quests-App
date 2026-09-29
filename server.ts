@@ -22,38 +22,6 @@ async function startServer() {
     });
   });
 
-  // Escrow verification endpoint
-  app.post("/api/escrow/verify", (req, res) => {
-    const { amount = 0, currency = "USD", questTitle = "Quest" } = req.body || {};
-    const parsedAmount = typeof amount === "number" ? amount : parseFloat(String(amount).replace(/[^0-9.]/g, "")) || 1000;
-    const platformFee = Math.round(parsedAmount * 0.03 * 100) / 100;
-    const netPayout = Math.round((parsedAmount - platformFee) * 100) / 100;
-
-    res.json({
-      verified: true,
-      questTitle,
-      escrowId: `ESC-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
-      lockedAmount: parsedAmount,
-      platformFee,
-      netPayout,
-      currency,
-      guarantee: "100% Escrow Collateralized",
-      releaseTrigger: "Mutual Sign-off / Milestone Acceptance",
-      timestamp: new Date().toISOString(),
-    });
-  });
-
-  // Platform creative gig ecosystem statistics
-  app.get("/api/stats", (_req, res) => {
-    res.json({
-      totalSecuredEscrow: "$4.8M+",
-      activeCreatives: "12,400+",
-      averageFillTime: "4.2 hrs",
-      disputeRate: "0.02%",
-      networkStatus: "Operational",
-    });
-  });
-
   // Vite middleware for development vs static build in production
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
