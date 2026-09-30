@@ -31,3 +31,26 @@
   box-shadow: 0 0 25px rgba(195, 244, 0, 0.4);
 }
 
+
+/* ---------- Landing page motion ---------- */
+@keyframes lpColUp { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+@keyframes lpColDown { from { transform: translateY(-50%); } to { transform: translateY(0); } }
+.lp-col-up { animation: lpColUp 46s linear infinite; }
+.lp-col-down { animation: lpColDown 52s linear infinite; }
+.lp-fade-mask {
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 12%, #000 88%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 12%, #000 88%, transparent 100%);
+}
+@keyframes lpRise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+.lp-rise { animation: lpRise .7s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes lpPulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+.lp-pulse { animation: lpPulse 1.8s ease-in-out infinite; }
+@keyframes lpPop { 0% { transform: scale(.96); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+.lp-pop { animation: lpPop .35s cubic-bezier(.2,.8,.2,1) both; }
+.lp-lift { transition: transform .25s ease, box-shadow .25s ease; }
+.lp-lift:hover { transform: translateY(-3px); }
+.lp-fade-mask:hover .lp-col-up, .lp-fade-mask:hover .lp-col-down { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .lp-col-up, .lp-col-down, .lp-rise, .lp-pulse, .lp-pop { animation: none !important; }
+  .lp-lift:hover { transform: none; }
+}
