@@ -57,6 +57,7 @@ import { INITIAL_USER_PROFILE, ARTIST_CATEGORIES, PROVIDER_CATEGORIES } from './
 import { ProfileCreator } from './components/ProfileCreator';
 import { ProfileView } from './components/ProfileView';
 import { PostQuestModal } from './components/PostQuestModal';
+import { SiteHeader, SiteFooter, MobileTabBar } from './components/SiteChrome';
 import { LandingHero, Disciplines, HowItWorks, BothSides, FoundingCreatives, PricingCalculator, FinalCTA } from './components/Landing';
 import { AuthModal } from './components/AuthModal';
 import { ApplyModal } from './components/ApplyModal';
@@ -479,11 +480,41 @@ export default function App() {
     showToast('Direct hiring arrives with Protected Payments. For now, post a quest and they can apply.', 'info');
   };
 
+  const goTab = (tab: 'quests' | 'creatives' | 'learn' | 'pricing' | 'tasks' | 'profile') => {
+    setActiveTab(tab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const scrollToHow = () => {
+    setActiveTab('quests');
+    setTimeout(() => {
+      document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
   const scrollToQuests = () => {
     setActiveTab('quests');
     setTimeout(() => {
       questsSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
+  };
+
+  const chromeNav = {
+    activeTab,
+    go: goTab,
+    findGigs: scrollToQuests,
+    howItWorks: scrollToHow,
+    openProfile: () => { setIsEditingProfile(false); goTab('profile'); },
+  };
+  const chromeAccount = {
+    signedIn: !!currentUser,
+    isProvider: userProfile.accountType === 'provider',
+    name: userProfile.displayName || currentUser?.displayName || '',
+    avatarUrl: userProfile.avatarUrl || currentUser?.photoURL || '',
+    onSignIn: () => openAuth('signin'),
+    onJoin: () => openAuth('signup'),
+    onSignOut: handleGoogleSignOut,
+    onPostQuest: openPostQuest,
   };
 
   return (
@@ -512,89 +543,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* FIXED HEADER */}
-      <header className="fixed top-0 w-full h-16 z-40 bg-brand-bg/85 backdrop-blur-md border-b border-white/10 flex justify-between items-center px-4 md:px-16" role="banner">
-        <div className="flex items-center gap-3">
-          <button aria-label="Menu" className="text-white hover:text-brand-volt transition-colors" onClick={() => scrollToQuests()}>
-            <Menu className="w-6 h-6" />
-          </button>
-          <h1 className="font-display text-2xl md:text-3xl font-bold tracking-tight text-white cursor-pointer select-none" onClick={() => setActiveTab('quests')}>
-            SIDEQUESTS
-          </h1>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="hidden md:flex gap-6 text-xs uppercase font-mono tracking-widest text-brand-text-muted items-center">
-            <button className={`hover:text-brand-volt transition-colors ${activeTab === 'quests' ? 'text-brand-volt' : ''}`} onClick={() => setActiveTab('quests')}>Ecosystem</button>
-            <button className={`hover:text-brand-volt transition-colors ${activeTab === 'creatives' ? 'text-brand-volt' : ''}`} onClick={() => setActiveTab('creatives')}>Creatives</button>
-            <button className={`hover:text-brand-volt transition-colors ${activeTab === 'learn' ? 'text-brand-volt' : ''}`} onClick={() => setActiveTab('learn')}>Academy</button>
-            <button className={`hover:text-brand-volt transition-colors ${activeTab === 'pricing' ? 'text-brand-volt' : ''}`} onClick={() => setActiveTab('pricing')}>Payment Protection</button>
-            <button className={`hover:text-brand-volt transition-colors ${activeTab === 'tasks' ? 'text-brand-volt' : ''}`} onClick={() => setActiveTab('tasks')}>OS Console</button>
-            <button className={`hover:text-brand-volt transition-colors ${activeTab === 'profile' ? 'text-brand-volt font-bold' : ''}`} onClick={() => { setActiveTab('profile'); setIsEditingProfile(false); }}>Profile</button>
-          </div>
-
-          {/* Backend Server Status Pill */}
-          {serverStatus && (
-            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-volt/5 border border-brand-volt/20 text-brand-volt font-mono text-[9px] uppercase tracking-wider">
-              <span className="w-1.5 h-1.5 rounded-full bg-brand-volt animate-ping" />
-              <span>Full-Stack Live</span>
-            </div>
-          )}
-
-          {/* Google Auth / Profile Controls */}
-          {currentUser ? (
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => {
-                  setActiveTab('profile');
-                  setIsEditingProfile(false);
-                }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
-                  activeTab === 'profile' 
-                    ? 'bg-brand-volt/15 border-brand-volt text-brand-volt shadow-[0_0_15px_rgba(195,244,0,0.2)]' 
-                    : 'bg-white/5 border-white/10 hover:border-white/20 text-white'
-                }`}
-              >
-                <Avatar src={userProfile.avatarUrl || currentUser.photoURL || ''} name={userProfile.displayName || currentUser.displayName || ''} className="w-5 h-5 rounded-full border border-brand-volt/40 text-[8px]" />
-                <span className="hidden sm:inline font-sans text-xs font-semibold max-w-[110px] truncate text-white">
-                  {(currentUser.displayName || userProfile.displayName).split(' ')[0]}
-                </span>
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-volt" title="Synced with Firebase" />
-              </button>
-
-              <button
-                onClick={handleGoogleSignOut}
-                title="Sign Out"
-                className="text-brand-text-muted hover:text-red-400 text-xs px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-colors font-mono uppercase text-[10px]"
-              >
-                Logout
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={handleGoogleSignIn}
-              className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-mono text-xs tracking-wider transition-all hover:border-brand-volt/60 hover:text-brand-volt cursor-pointer shadow-sm active:scale-95"
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
-                <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z" />
-                <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
-                <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2c0 2.8.7 5.5 1.9 7.8l3.7-2.9z" />
-                <path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z" />
-              </svg>
-              <span className="hidden sm:inline">Sign In / Sign Up</span>
-              <span className="sm:hidden">Sign In</span>
-            </button>
-          )}
-
-          <button 
-            aria-label="Notifications" 
-            className="text-brand-text-muted hover:text-brand-volt transition-colors relative"
-            onClick={() => showToast('Protocol monitoring: No critical warnings detected.', 'info')}
-          >
-            <Notifications className="w-6 h-6" />
-            <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-brand-volt text-glow"></span>
-          </button>
-        </div>
-      </header>
+      <SiteHeader nav={chromeNav} account={chromeAccount} />
 
       {/* MAIN CONTAINER */}
       <main className="flex-grow pt-16 pb-24 md:pb-12 max-w-7xl mx-auto w-full px-4 md:px-8">
@@ -1063,148 +1012,9 @@ export default function App() {
 
       </main>
 
-      {/* FOOTER */}
-      <footer className="bg-brand-bg border-t border-white/5 pt-16 pb-28 md:pb-16 px-4 md:px-16" role="contentinfo">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
-          <div className="md:col-span-1">
-            <h2 className="font-display text-2xl text-white tracking-tight mb-4 font-semibold">SIDEQUESTS</h2>
-            <p className="text-brand-text-muted text-xs leading-relaxed max-w-xs">
-              The professional network and operating system for the global creative economy. Handcrafted by creatives
-            </p>
-          </div>
-          <div>
-            <h5 className="font-mono text-[10px] text-white uppercase tracking-widest mb-4 font-semibold">Platform</h5>
-            <ul className="space-y-2 text-xs text-brand-text-muted">
-              <li><button onClick={() => setActiveTab('creatives')} className="hover:text-brand-volt transition-colors">Creatives</button></li>
-              <li><button onClick={() => scrollToQuests()} className="hover:text-brand-volt transition-colors">Quests</button></li>
-              <li><button onClick={() => setActiveTab('learn')} className="hover:text-brand-volt transition-colors">Learn</button></li>
-              <li><button onClick={() => setActiveTab('pricing')} className="hover:text-brand-volt transition-colors">Pricing</button></li>
-              <li><button onClick={() => { setActiveTab('profile'); setIsEditingProfile(false); }} className="hover:text-brand-volt transition-colors">My Profile</button></li>
-            </ul>
-          </div>
-          <div>
-            <h5 className="font-mono text-[10px] text-white uppercase tracking-widest mb-4 font-semibold">Company</h5>
-            <ul className="space-y-2 text-xs text-brand-text-muted">
-              <li><button onClick={() => showToast('About SideQuests: the gig network for creatives of every kind.', 'info')} className="hover:text-brand-volt transition-colors">About Us</button></li>
-              <li><button onClick={() => showToast('Protected Payments and verified profiles.', 'info')} className="hover:text-brand-volt transition-colors">Trust & Safety</button></li>
-              <li><button onClick={() => showToast('GDPR Compliant Privacy Terms.', 'info')} className="hover:text-brand-volt transition-colors">Privacy Policy</button></li>
-              <li><button onClick={() => showToast('Terms of Service and Dispute resolution rules.', 'info')} className="hover:text-brand-volt transition-colors">Terms of Service</button></li>
-            </ul>
-          </div>
-          <div>
-            <h5 className="font-mono text-[10px] text-white uppercase tracking-widest mb-4 font-semibold">Social</h5>
-            <div className="flex gap-3">
-              <a aria-label="Instagram" className="w-10 h-10 rounded-lg border border-white/10 flex items-center justify-center hover:bg-white/5 text-brand-text-muted hover:text-brand-volt transition-colors" href="#">
-                <CameraAlt className="w-5 h-5" />
-              </a>
-              <a aria-label="Twitter" className="w-10 h-10 rounded-lg border border-white/10 flex items-center justify-center hover:bg-white/5 text-brand-text-muted hover:text-brand-volt transition-colors" href="#">
-                <Share className="w-5 h-5" />
-              </a>
-              <a aria-label="LinkedIn" className="w-10 h-10 rounded-lg border border-white/10 flex items-center justify-center hover:bg-white/5 text-brand-text-muted hover:text-brand-volt transition-colors" href="#">
-                <Groups className="w-5 h-5" />
-              </a>
-            </div>
-          </div>
-        </div>
-        <div className="pt-6 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center gap-3 text-brand-text-muted font-mono text-[10px] uppercase tracking-wider">
-          <span>© 2026 SIDEQUESTS GLOBAL INC.</span>
-          <span>HANDCRAFTED FOR CREATIVES</span>
-        </div>
-      </footer>
+      <SiteFooter nav={chromeNav} account={chromeAccount} />
 
-      {/* MOBILE BOTTOM NAVIGATION BAR */}
-      <nav aria-label="Bottom navigation" className="fixed bottom-0 left-0 w-full z-40 bg-brand-bg/95 backdrop-blur-md border-t border-white/5 py-2.5 px-2 flex justify-around items-center md:hidden">
-        <button 
-          onClick={() => {
-            setActiveTab('quests');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-            activeTab === 'quests' 
-              ? 'text-brand-volt bg-brand-volt/10 font-bold' 
-              : 'text-brand-text-muted hover:text-white opacity-70'
-          }`}
-        >
-          <Explore className="w-5 h-5" />
-          <span className="font-mono text-[10px] uppercase tracking-wider mt-1">Quests</span>
-        </button>
-
-        <button 
-          onClick={() => {
-            setActiveTab('creatives');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-            activeTab === 'creatives' 
-              ? 'text-brand-volt bg-brand-volt/10 font-bold' 
-              : 'text-brand-text-muted hover:text-white opacity-70'
-          }`}
-        >
-          <Palette className="w-5 h-5" />
-          <span className="font-mono text-[10px] uppercase tracking-wider mt-1">Creatives</span>
-        </button>
-
-        <button 
-          onClick={() => {
-            setActiveTab('learn');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-            activeTab === 'learn' 
-              ? 'text-brand-volt bg-brand-volt/10 font-bold' 
-              : 'text-brand-text-muted hover:text-white opacity-70'
-          }`}
-        >
-          <School className="w-5 h-5" />
-          <span className="font-mono text-[10px] uppercase tracking-wider mt-1">Learn</span>
-        </button>
-
-        <button 
-          onClick={() => {
-            setActiveTab('pricing');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-            activeTab === 'pricing' 
-              ? 'text-brand-volt bg-brand-volt/10 font-bold' 
-              : 'text-brand-text-muted hover:text-white opacity-70'
-          }`}
-        >
-          <Payments className="w-5 h-5" />
-          <span className="font-mono text-[10px] uppercase tracking-wider mt-1">Pricing</span>
-        </button>
-
-        <button 
-          onClick={() => {
-            setActiveTab('tasks');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-            activeTab === 'tasks' 
-              ? 'text-brand-volt bg-brand-volt/10 font-bold' 
-              : 'text-brand-text-muted hover:text-white opacity-70'
-          }`}
-        >
-          <Checklist className="w-5 h-5" />
-          <span className="font-mono text-[10px] uppercase tracking-wider mt-1">Tasks</span>
-        </button>
-
-        <button 
-          onClick={() => {
-            setActiveTab('profile');
-            setIsEditingProfile(false);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-            activeTab === 'profile' 
-              ? 'text-brand-volt bg-brand-volt/10 font-bold' 
-              : 'text-brand-text-muted hover:text-white opacity-70'
-          }`}
-        >
-          <AccountCircle className="w-5 h-5" />
-          <span className="font-mono text-[10px] uppercase tracking-wider mt-1">Profile</span>
-        </button>
-      </nav>
+      <MobileTabBar nav={chromeNav} account={chromeAccount} />
 
       {/* DETAILS / MODAL OVERLAYS */}
       

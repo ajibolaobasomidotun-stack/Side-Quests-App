@@ -493,7 +493,6 @@ export function FinalCTA({ onJoin, onPost }: { onJoin: () => void; onPost: () =>
         <button onClick={onJoin} className="bg-brand-volt text-brand-bg font-semibold px-8 py-4 rounded-xl hover:scale-[1.02] active:scale-95 transition-all glow-btn cursor-pointer">Join as a creative</button>
         <button onClick={onPost} className="border border-white/20 text-white font-semibold px-8 py-4 rounded-xl hover:bg-white/5 active:scale-95 transition-colors cursor-pointer">Post a quest</button>
       </div>
-      <p className="mt-10 text-xs text-[#6E6E68]">Photos: Unsplash</p>
     </section>
   );
 }
