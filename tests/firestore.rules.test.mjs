@@ -42,6 +42,7 @@ await t('cannot edit someone else\'s profile', () => assertFails(updateDoc(doc(a
 await t('invalid accountType rejected', () => assertFails(updateDoc(doc(artist, 'users/artist1'), { accountType: 'admin' })));
 await t('small profile photo accepted', () => assertSucceeds(updateDoc(doc(artist, 'users/artist1'), { avatarUrl: 'data:image/jpeg;base64,' + 'A'.repeat(30000) })));
 await t('oversized profile photo rejected', () => assertFails(updateDoc(doc(artist, 'users/artist1'), { avatarUrl: 'data:image/jpeg;base64,' + 'A'.repeat(200000) })));
+await t('cannot mark own payouts ready', () => assertFails(updateDoc(doc(artist, 'users/artist1'), { payoutsReady: true })));
 await t('anyone can read profiles', () => assertSucceeds(getDoc(doc(anon, 'users/artist1'))));
 await env.withSecurityRulesDisabled(async (c) => { await updateDoc(doc(c.firestore(), 'users/artist2'), { verified: true }); });
 await t('verified user can still edit other fields', () => assertSucceeds(updateDoc(doc(artist2, 'users/artist2'), { bio: 'hi' })));
@@ -111,14 +112,21 @@ await t('studio cannot edit plan once proposed', () => assertFails(updateDoc(doc
 await t('studio cannot self-accept', () => assertFails(updateDoc(doc(studio, 'contracts/q5_artist1'), { status: 'active', updatedAt: 'z' })));
 await t('creative asks for changes', () => assertSucceeds(updateDoc(doc(artist, 'contracts/q5_artist1'), { status: 'setup', changeRequest: 'Can we split edits into two?', updatedAt: 'z' })));
 await t('studio re-proposes', () => assertSucceeds(updateDoc(doc(studio, 'contracts/q5_artist1'), { status: 'proposed', changeRequest: '', updatedAt: 'z' })));
-await t('creative accepts', () => assertSucceeds(updateDoc(doc(artist, 'contracts/q5_artist1'), { status: 'active', updatedAt: 'z' })));
+await t('creative cannot skip payment and go active', () => assertFails(updateDoc(doc(artist, 'contracts/q5_artist1'), { status: 'active', updatedAt: 'z' })));
+await t('creative accepts (awaiting payment)', () => assertSucceeds(updateDoc(doc(artist, 'contracts/q5_artist1'), { status: 'awaiting_payment', updatedAt: 'z' })));
+await t('gig provider cannot mark own contract paid', () => assertFails(updateDoc(doc(studio, 'contracts/q5_artist1'), { status: 'active', paymentStatus: 'paid', updatedAt: 'z' })));
+await env.withSecurityRulesDisabled(async (c) => {
+  // What the Stripe webhook does after payment clears
+  await updateDoc(doc(c.firestore(), 'contracts/q5_artist1'), { status: 'active', paymentStatus: 'paid', fundedAmountCents: 290000, releasedAmountCents: 0 });
+});
 await t('nobody can change the total once active', () => assertFails(updateDoc(doc(studio, 'contracts/q5_artist1'), { totalAmount: 1, updatedAt: 'z' })));
 await t('studio cannot approve unsubmitted milestone', () => assertFails(updateDoc(doc(studio, 'contracts/q5_artist1/milestones/m1'), { status: 'approved', feedback: '', reviewedAt: 'z' })));
 await t('creative cannot approve own milestone', () => assertFails(updateDoc(doc(artist, 'contracts/q5_artist1/milestones/m1'), { status: 'approved', feedback: '', reviewedAt: 'z' })));
 await t('creative submits milestone', () => assertSucceeds(updateDoc(doc(artist, 'contracts/q5_artist1/milestones/m1'), { status: 'submitted', submissionNote: 'Selects attached', submittedAt: 'z' })));
 await t('studio requests changes', () => assertSucceeds(updateDoc(doc(studio, 'contracts/q5_artist1/milestones/m1'), { status: 'changes_requested', feedback: 'Brighter please', reviewedAt: 'z' })));
 await t('creative resubmits', () => assertSucceeds(updateDoc(doc(artist, 'contracts/q5_artist1/milestones/m1'), { status: 'submitted', submissionNote: 'Brighter now', submittedAt: 'z2' })));
-await t('studio approves', () => assertSucceeds(updateDoc(doc(studio, 'contracts/q5_artist1/milestones/m1'), { status: 'approved', feedback: 'Great', reviewedAt: 'z2' })));
+await t('studio cannot approve directly (money moves server-side)', () => assertFails(updateDoc(doc(studio, 'contracts/q5_artist1/milestones/m1'), { status: 'approved', feedback: 'Great', reviewedAt: 'z2' })));
+await t('studio cannot fake a payout record', () => assertFails(updateDoc(doc(studio, 'contracts/q5_artist1'), { releasedAmountCents: 0, updatedAt: 'z' })));
 await t('creative cannot cancel an active contract', () => assertFails(updateDoc(doc(artist, 'contracts/q5_artist1'), { status: 'cancelled', updatedAt: 'z' })));
 await t('creative cannot complete contract', () => assertFails(updateDoc(doc(artist, 'contracts/q5_artist1'), { status: 'completed', updatedAt: 'z' })));
 // messages

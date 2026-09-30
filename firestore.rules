@@ -53,12 +53,14 @@ service cloud.firestore {
       allow create: if isSignedIn() && uid() == userId
         && incoming().accountType in ['artist', 'provider']
         && !('verified' in incoming())
+        && !('payoutsReady' in incoming())
         && !('email' in incoming())
         && smallImageOrAbsent('avatarUrl');
 
       allow update: if isSignedIn() && uid() == userId
         && incoming().accountType in ['artist', 'provider']
         && incoming().get('verified', false) == existing().get('verified', false)
+        && incoming().get('payoutsReady', false) == existing().get('payoutsReady', false)
         && !('email' in incoming())
         && smallImageOrAbsent('avatarUrl');
 
@@ -165,16 +167,18 @@ service cloud.firestore {
                   && onlyChanges(['totalAmount', 'updatedAt'])
                   && incoming().totalAmount is number && incoming().totalAmount > 0)
              || (statusMoves(['setup'], 'proposed') && onlyChanges(['status', 'updatedAt', 'changeRequest']))
-             || (statusMoves(['setup', 'proposed'], 'cancelled') && onlyChanges(['status', 'updatedAt']))
+             || (statusMoves(['setup', 'proposed', 'awaiting_payment'], 'cancelled') && onlyChanges(['status', 'updatedAt'])
+                  && existing().get('paymentStatus', '') != 'processing')
              || (statusMoves(['active'], 'completed') && onlyChanges(['status', 'updatedAt']))
           ))
 
           // Creative
           || (uid() == existing().creativeUid && (
-                (statusMoves(['proposed'], 'active') && onlyChanges(['status', 'updatedAt']))
+                (statusMoves(['proposed'], 'awaiting_payment') && onlyChanges(['status', 'updatedAt']))
              || (statusMoves(['proposed'], 'setup') && onlyChanges(['status', 'updatedAt', 'changeRequest'])
                   && incoming().changeRequest is string && incoming().changeRequest.size() <= 2000)
-             || (statusMoves(['setup', 'proposed'], 'cancelled') && onlyChanges(['status', 'updatedAt']))
+             || (statusMoves(['setup', 'proposed', 'awaiting_payment'], 'cancelled') && onlyChanges(['status', 'updatedAt'])
+                  && existing().get('paymentStatus', '') != 'processing')
           ))
         );
 
@@ -220,10 +224,11 @@ service cloud.firestore {
             && onlyChanges(['status', 'submissionNote', 'submittedAt'])
             && incoming().submissionNote is string && incoming().submissionNote.size() <= 2000)
 
-          // Gig provider approves or asks for changes
+          // Gig provider asks for changes. Approving releases money, so it
+          // only happens in the approveMilestone server function.
           || (contractNow().clientUid == uid() && contractNow().status == 'active'
             && existing().status == 'submitted'
-            && incoming().status in ['approved', 'changes_requested']
+            && incoming().status == 'changes_requested'
             && onlyChanges(['status', 'feedback', 'reviewedAt'])
             && incoming().feedback is string && incoming().feedback.size() <= 2000)
         );

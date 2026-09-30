@@ -24,6 +24,7 @@ import {
   type Timestamp
 } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app, db } from './firebase';
 import type {
   Application,
@@ -261,4 +262,41 @@ export async function reviewMilestone(contractId: string, milestoneId: string, a
     feedback: feedback.slice(0, 2000),
     reviewedAt: nowIso()
   });
+}
+
+// ---------------------------------------------------------------------------
+// Protected Payments (Stripe) — these run on the server (functions/src/index.ts)
+// ---------------------------------------------------------------------------
+
+const functions = getFunctions(app, 'us-central1');
+export const PLATFORM_FEE_RATE = 0.03;
+export const platformFee = (total: number) => Math.round(total * 100 * PLATFORM_FEE_RATE) / 100;
+
+async function callForUrl(name: string, data: Record<string, unknown> = {}): Promise<string> {
+  const res = await httpsCallable<Record<string, unknown>, { url: string }>(functions, name)(data);
+  return res.data.url;
+}
+
+/** Sends the creative to Stripe to add identity and bank details. */
+export const startPayoutOnboarding = () => callForUrl('createPayoutOnboardingLink');
+/** Opens the creative's Stripe Express dashboard. */
+export const openPayoutDashboard = () => callForUrl('createPayoutDashboardLink');
+/** Creates a Stripe Checkout page for the gig provider to fund the contract. */
+export const startContractCheckout = (contractId: string) => callForUrl('createContractCheckout', { contractId });
+
+export async function refreshPayoutStatus(): Promise<{ payoutsReady: boolean; detailsSubmitted: boolean }> {
+  const res = await httpsCallable<Record<string, never>, { payoutsReady: boolean; detailsSubmitted: boolean }>(functions, 'refreshPayoutStatus')({});
+  return res.data;
+}
+
+/** Approves a submitted milestone and releases its money to the creative. */
+export async function approveMilestoneAndRelease(contractId: string, milestoneId: string, feedback: string) {
+  await httpsCallable(functions, 'approveMilestone')({ contractId, milestoneId, feedback });
+}
+
+/** Turns a Firebase callable error into a message worth showing. */
+export function paymentErrorMessage(err: unknown): string {
+  const e = err as { code?: string; message?: string };
+  if (e?.code && e.code !== 'functions/internal' && e.message) return e.message;
+  return 'Something went wrong talking to the payment service. Please try again.';
 }

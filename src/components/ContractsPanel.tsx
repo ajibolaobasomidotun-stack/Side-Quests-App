@@ -12,7 +12,12 @@ import {
   cancelContract,
   submitMilestone,
   reviewMilestone,
-  MAX_UPLOAD_BYTES
+  MAX_UPLOAD_BYTES,
+  platformFee,
+  startContractCheckout,
+  startPayoutOnboarding,
+  approveMilestoneAndRelease,
+  paymentErrorMessage
 } from '../lib/contracts';
 import { Avatar } from './Avatar';
 import { AttachFile, Send, CheckCircle, Close, Plus, Trash2, ChevronLeft, Download, Work } from './Icons';
@@ -24,6 +29,7 @@ type Toast = (message: string, type?: 'success' | 'info' | 'error') => void;
 // ---------------------------------------------------------------------------
 
 const money = (n: number) => `$${Math.round(Number(n) || 0).toLocaleString()}`;
+const money2 = (n: number) => `$${(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const formatBytes = (b: number) =>
   b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(1)} GB`
@@ -36,6 +42,7 @@ const formatTime = (d: Date | null) =>
 const CONTRACT_STATUS: Record<Contract['status'], { label: string; cls: string }> = {
   setup: { label: 'Setting up', cls: 'bg-white/5 text-white border-white/15' },
   proposed: { label: 'Awaiting acceptance', cls: 'bg-amber-500/10 text-amber-300 border-amber-500/20' },
+  awaiting_payment: { label: 'Awaiting payment', cls: 'bg-amber-500/10 text-amber-300 border-amber-500/20' },
   active: { label: 'In progress', cls: 'bg-sky-500/10 text-sky-300 border-sky-500/20' },
   completed: { label: 'Completed', cls: 'bg-brand-volt/15 text-brand-volt border-brand-volt/30' },
   cancelled: { label: 'Cancelled', cls: 'bg-red-500/10 text-red-300 border-red-500/20' }
@@ -207,7 +214,7 @@ const ContractWorkspace: React.FC<WorkspaceProps> = ({ contract, uid, profile, o
         {(contract.status === 'active' || contract.status === 'completed') && milestones.length > 0 && (
           <div className="mt-4">
             <div className="flex justify-between text-[10px] font-mono uppercase tracking-wider text-brand-text-muted mb-1">
-              <span>Approved {money(approvedTotal)} of {money(contract.totalAmount)}</span>
+              <span>Released {money(approvedTotal)} of {money(contract.totalAmount)}</span>
               <span>{milestones.filter((m) => m.status === 'approved').length}/{milestones.length} milestones</span>
             </div>
             <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
@@ -225,7 +232,26 @@ const ContractWorkspace: React.FC<WorkspaceProps> = ({ contract, uid, profile, o
         allApproved={allApproved}
         busy={busy}
         onPropose={() => act(() => setContractStatus(contract.id, 'proposed', { changeRequest: '' }), 'Sent the milestone plan for acceptance.', 'Terms sent.')}
-        onAccept={() => act(() => setContractStatus(contract.id, 'active'), 'Accepted the terms. Work can begin.', 'Contract started!')}
+        onAccept={() => act(() => setContractStatus(contract.id, 'awaiting_payment'), `Accepted the terms. Waiting for ${otherName} to pay.`, 'Terms accepted!')}
+        onPay={async () => {
+          setBusy(true);
+          try {
+            window.location.href = await startContractCheckout(contract.id);
+          } catch (err) {
+            showToast(paymentErrorMessage(err), 'error');
+            setBusy(false);
+          }
+        }}
+        onSetUpPayouts={async () => {
+          setBusy(true);
+          try {
+            window.location.href = await startPayoutOnboarding();
+          } catch (err) {
+            showToast(paymentErrorMessage(err), 'error');
+            setBusy(false);
+          }
+        }}
+        payoutsReady={!!profile.payoutsReady}
         onRequestChanges={(note) => act(() => setContractStatus(contract.id, 'setup', { changeRequest: note }), `Asked for changes to the terms: “${note}”`, 'Change request sent.')}
         onCancel={() => {
           if (!window.confirm('Cancel this contract? This can’t be undone.')) return;
@@ -253,11 +279,21 @@ const ContractWorkspace: React.FC<WorkspaceProps> = ({ contract, uid, profile, o
                   isClient={isClient}
                   busy={busy}
                   onSubmit={(note) => act(() => submitMilestone(contract.id, m.id, note), `Submitted “${m.title}” for review.${note ? ` Note: ${note}` : ''}`, 'Submitted for review.')}
-                  onReview={(approve, feedback) => act(
-                    () => reviewMilestone(contract.id, m.id, approve, feedback),
-                    approve ? `Approved “${m.title}”.${feedback ? ` ${feedback}` : ''}` : `Requested changes on “${m.title}”: ${feedback}`,
-                    approve ? 'Milestone approved.' : 'Changes requested.'
-                  )}
+                  onReview={async (approve, feedback) => {
+                    if (!approve) {
+                      return act(() => reviewMilestone(contract.id, m.id, false, feedback), `Requested changes on “${m.title}”: ${feedback}`, 'Changes requested.');
+                    }
+                    if (!window.confirm(`Approve “${m.title}” and release ${money(m.amount)} to ${otherName}? This can’t be undone.`)) return;
+                    setBusy(true);
+                    try {
+                      await approveMilestoneAndRelease(contract.id, m.id, feedback);
+                      showToast(`Approved. ${money(m.amount)} released to ${otherName}.`, 'success');
+                    } catch (err) {
+                      showToast(paymentErrorMessage(err), 'error');
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
                 />
               ))}
             </ol>
@@ -283,6 +319,9 @@ interface BannerProps {
   busy: boolean;
   onPropose: () => void;
   onAccept: () => void;
+  onPay: () => void;
+  onSetUpPayouts: () => void;
+  payoutsReady: boolean;
   onRequestChanges: (note: string) => void;
   onCancel: () => void;
   onComplete: () => void;
@@ -328,7 +367,10 @@ const StatusBanner: React.FC<BannerProps> = (p) => {
         <div className="mt-4"><button disabled={busy} onClick={p.onCancel} className={btnGhost}>Cancel contract</button></div>
       </>) : box(<>
         <p className="text-sm text-white font-semibold">Review and accept the terms</p>
-        <p className="text-xs text-brand-text-muted mt-1">{otherName} proposed the milestones below, totalling {money(contract.totalAmount)}.</p>
+        <p className="text-xs text-brand-text-muted mt-1">{otherName} proposed the milestones below, totalling {money(contract.totalAmount)}. Once you accept, they pay the full amount up front and it’s released to you as each milestone is approved.</p>
+        {!p.payoutsReady && (
+          <p className="text-[11px] text-amber-200 mt-2">Before accepting, set up payouts with Stripe so you can be paid. It takes a few minutes and your bank details stay with Stripe.</p>
+        )}
         {asking ? (
           <div className="mt-3 space-y-2">
             <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={2000} placeholder="What would you like changed?" className={inputCls} />
@@ -339,23 +381,61 @@ const StatusBanner: React.FC<BannerProps> = (p) => {
           </div>
         ) : (
           <div className="flex flex-wrap gap-2 mt-4">
-            <button disabled={busy} onClick={p.onAccept} className={btnPrimary}>Accept terms & start</button>
+            {p.payoutsReady ? (
+              <button disabled={busy} onClick={p.onAccept} className={btnPrimary}>Accept terms</button>
+            ) : (
+              <button disabled={busy} onClick={p.onSetUpPayouts} className={btnPrimary}>Set up payouts to accept</button>
+            )}
             <button disabled={busy} onClick={() => setAsking(true)} className={btnGhost}>Ask for changes</button>
             <button disabled={busy} onClick={p.onCancel} className={btnGhost}>Decline</button>
           </div>
         )}
       </>, 'volt');
 
+    case 'awaiting_payment': {
+      const fee = platformFee(contract.totalAmount);
+      const processing = contract.paymentStatus === 'processing';
+      const failed = contract.paymentStatus === 'failed';
+      return isClient ? box(<>
+        <p className="text-sm text-white font-semibold">{processing ? 'Bank payment processing' : 'Pay to start the contract'}</p>
+        {processing ? (
+          <p className="text-xs text-brand-text-muted mt-1">Bank payments usually take 2–5 business days to clear. The contract starts automatically once it does.</p>
+        ) : (
+          <>
+            <p className="text-xs text-brand-text-muted mt-1">{otherName} accepted the terms. Your payment is held by SideQuests Protected Payments and released as you approve each milestone.</p>
+            {failed && <p className="text-xs text-red-300 mt-2">Your last payment didn’t go through. Please try again.</p>}
+            <div className="mt-3 text-xs bg-brand-bg/60 border border-white/10 rounded-lg p-3 space-y-1 max-w-xs">
+              <div className="flex justify-between"><span className="text-brand-text-muted">Contract total</span><span className="text-white font-mono">{money2(contract.totalAmount)}</span></div>
+              <div className="flex justify-between"><span className="text-brand-text-muted">Platform fee (3%)</span><span className="text-white font-mono">{money2(fee)}</span></div>
+              <div className="flex justify-between border-t border-white/10 pt-1"><span className="text-white font-semibold">You pay</span><span className="text-brand-volt font-mono font-bold">{money2(contract.totalAmount + fee)}</span></div>
+            </div>
+            <p className="text-[11px] text-brand-text-muted mt-2">Pay by bank account (recommended) or card on the next screen.</p>
+          </>
+        )}
+        <div className="flex flex-wrap gap-2 mt-4">
+          {!processing && <button disabled={busy} onClick={p.onPay} className={btnPrimary}>Pay {money2(contract.totalAmount + fee)}</button>}
+          {!processing && <button disabled={busy} onClick={p.onCancel} className={btnGhost}>Cancel contract</button>}
+        </div>
+      </>, 'volt') : box(<>
+        <p className="text-sm text-white font-semibold">Waiting for payment</p>
+        <p className="text-xs text-brand-text-muted mt-1">
+          {processing
+            ? `${otherName} paid by bank transfer, which usually clears in 2–5 business days. The contract starts automatically once it does.`
+            : `${otherName} needs to pay ${money(contract.totalAmount)} before work starts. You’ll see it here as soon as they do.`}
+        </p>
+      </>);
+    }
+
     case 'active':
       return box(<>
         <p className="text-sm text-white font-semibold">Work in progress</p>
         <p className="text-xs text-brand-text-muted mt-1">
           {isClient
-            ? 'Review each milestone when it’s submitted. Approve it, or ask for changes.'
-            : 'Submit each milestone for review when it’s ready. Attach files in the chat.'}
+            ? `Review each milestone when it’s submitted. Approving releases that milestone’s payment to ${otherName}.`
+            : 'Submit each milestone for review when it’s ready. Attach files in the chat. You’re paid as each one is approved.'}
         </p>
         <p className="text-[11px] text-brand-text-muted mt-2">
-          Protected Payments aren’t switched on yet, so payment is arranged directly between you for now.
+          The full amount is held by SideQuests Protected Payments.
         </p>
         {isClient && p.allApproved && (
           <div className="mt-4"><button disabled={busy} onClick={p.onComplete} className={btnPrimary}>Mark contract complete</button></div>
@@ -481,7 +561,10 @@ const MilestoneRow: React.FC<MilestoneRowProps> = ({ index, milestone: m, contra
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm text-white font-semibold"><span className="text-brand-text-muted font-mono mr-1.5">{index + 1}.</span>{m.title}</p>
-          <div className="mt-1.5"><Chip {...MILESTONE_STATUS[m.status]} /></div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <Chip {...MILESTONE_STATUS[m.status]} />
+            {m.transferId && <Chip label={`Paid out${m.paidAt ? ` ${new Date(m.paidAt).toLocaleDateString()}` : ''}`} cls="bg-brand-volt/15 text-brand-volt border-brand-volt/30" />}
+          </div>
         </div>
         <span className="font-mono text-sm text-brand-volt font-bold">{money(m.amount)}</span>
       </div>
@@ -522,7 +605,7 @@ const MilestoneRow: React.FC<MilestoneRowProps> = ({ index, milestone: m, contra
             {canSubmit && <button disabled={busy} onClick={() => setMode('submit')} className={btnPrimary}>{m.status === 'changes_requested' ? 'Resubmit for review' : 'Submit for review'}</button>}
             {canReview && (
               <>
-                <button disabled={busy} onClick={() => onReview(true, '')} className={`${btnPrimary} flex items-center gap-1`}><CheckCircle className="w-3.5 h-3.5" /> Approve</button>
+                <button disabled={busy} onClick={() => onReview(true, '')} className={`${btnPrimary} flex items-center gap-1`}><CheckCircle className="w-3.5 h-3.5" /> Approve & release {money(m.amount)}</button>
                 <button disabled={busy} onClick={() => setMode('changes')} className={`${btnGhost} flex items-center gap-1`}><Close className="w-3.5 h-3.5" /> Request changes</button>
               </>
             )}

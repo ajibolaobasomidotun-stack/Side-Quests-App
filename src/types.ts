@@ -158,6 +158,8 @@ export interface UserProfile {
 
   /** Set only by a SideQuests admin, never by the user. */
   verified?: boolean;
+  /** Set by the server once Stripe payouts are ready (creatives). */
+  payoutsReady?: boolean;
   createdAt: string;
 }
 
@@ -169,11 +171,12 @@ export interface UserProfile {
 /**
  * setup     – gig provider is editing the milestones
  * proposed  – terms sent, waiting for the creative to accept
+ * awaiting_payment – creative accepted; gig provider pays via Stripe (server activates)
  * active    – work in progress
  * completed – every milestone approved
  * cancelled – called off before work started
  */
-export type ContractStatus = 'setup' | 'proposed' | 'active' | 'completed' | 'cancelled';
+export type ContractStatus = 'setup' | 'proposed' | 'awaiting_payment' | 'active' | 'completed' | 'cancelled';
 
 export interface Contract {
   id: string;
@@ -190,6 +193,11 @@ export interface Contract {
   totalAmount: number;
   status: ContractStatus;
   changeRequest?: string;
+  /** Set by the server (Stripe) only. */
+  paymentStatus?: 'processing' | 'paid' | 'failed' | 'needs_review';
+  fundedAmountCents?: number;
+  feeAmountCents?: number;
+  releasedAmountCents?: number;
   createdAt: string;
   updatedAt?: string;
   lastMessageAt?: string;
@@ -209,6 +217,9 @@ export interface Milestone {
   submittedAt?: string;
   feedback?: string;
   reviewedAt?: string;
+  /** Set by the server when the milestone's money is released. */
+  transferId?: string;
+  paidAt?: string;
 }
 
 export interface ContractFile {

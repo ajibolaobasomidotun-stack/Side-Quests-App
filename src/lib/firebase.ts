@@ -128,6 +128,7 @@ export function docToProfile(uid: string, d: Record<string, any>): UserProfile {
     budgetTier: d.budgetTier,
     hiringGoals: d.hiringGoals || [],
     verified: d.verified === true,
+    payoutsReady: d.payoutsReady === true,
     createdAt: d.createdAt || nowIso()
   };
 }
@@ -142,7 +143,7 @@ export async function fetchUserProfile(uid: string): Promise<UserProfile | null>
  * `verified` is never written from the app — only an admin can set it (enforced in firestore.rules).
  */
 export async function saveUserProfile(uid: string, profile: UserProfile, isNew: boolean) {
-  const { id: _id, verified: _verified, ...rest } = profile;
+  const { id: _id, verified: _verified, payoutsReady: _payouts, ...rest } = profile;
   const payload = clean({
     ...rest,
     updatedAt: nowIso(),

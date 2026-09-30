@@ -62,7 +62,9 @@ import { ApplyModal } from './components/ApplyModal';
 import { Dashboard } from './components/Dashboard';
 import { Avatar } from './components/Avatar';
 import { ContractsPanel } from './components/ContractsPanel';
-import { hireAndCreateContract, subscribeMyContracts } from './lib/contracts';
+import { hireAndCreateContract, subscribeMyContracts, refreshPayoutStatus } from './lib/contracts';
+import { PayoutsCard } from './components/PayoutsCard';
+import { PricingSection } from './components/PricingSection';
 import {
   auth,
   signOutUser,
@@ -184,6 +186,44 @@ export default function App() {
     });
     return () => unsub();
   }, []);
+
+  // Returning from Stripe (payout onboarding or contract checkout)
+  const stripeReturnHandled = useRef(false);
+  useEffect(() => {
+    if (isAuthLoading || !currentUser || !hasProfile || stripeReturnHandled.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const payouts = params.get('payouts');
+    const contractId = params.get('contract');
+    const checkout = params.get('checkout');
+    if (!payouts && !checkout) return;
+    stripeReturnHandled.current = true;
+    window.history.replaceState({}, '', window.location.pathname);
+
+    if (payouts) {
+      setActiveTab('profile');
+      setIsEditingProfile(false);
+      refreshPayoutStatus()
+        .then(({ payoutsReady, detailsSubmitted }) => {
+          setUserProfile(prev => ({ ...prev, payoutsReady }));
+          showToast(
+            payoutsReady ? 'Payouts are set up. You can now accept contracts.'
+              : detailsSubmitted ? 'Stripe is reviewing your details. This usually takes a few minutes.'
+              : 'Payout setup isn’t finished yet. Click “Set up payouts” to continue.',
+            payoutsReady ? 'success' : 'info'
+          );
+        })
+        .catch(() => showToast('Could not check your payout status. Please try again.', 'error'));
+    }
+    if (contractId && checkout) {
+      openContract(contractId);
+      showToast(
+        checkout === 'success'
+          ? 'Payment submitted. Card payments confirm in moments; bank payments take 2–5 business days.'
+          : 'Payment cancelled. You can pay whenever you’re ready.',
+        checkout === 'success' ? 'success' : 'info'
+      );
+    }
+  }, [isAuthLoading, currentUser, hasProfile]);
 
   // Live quests from Firestore
   useEffect(() => {
@@ -915,7 +955,7 @@ export default function App() {
                       <div>
                         <h4 className="font-sans font-bold text-lg uppercase tracking-tight mb-2">Transparent Pricing</h4>
                         <p className="text-sm font-medium text-brand-bg/80 leading-relaxed">
-                          Flat, straightforward platform fees and zero hidden charges. You see exactly what the creative earns and exactly what the gig provider pays.
+                          A flat 3% fee, paid by the gig provider, and no hidden charges. Creatives keep their full agreed rate.
                         </p>
                       </div>
                     </div>
@@ -1152,148 +1192,7 @@ export default function App() {
 
           {/* PRICING & FEES VIEW */}
           {activeTab === 'pricing' && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-10">
-              <div className="mb-12 max-w-xl">
-                <h3 className="font-display text-3xl md:text-4xl text-white font-semibold">Platform Fees & Tiers</h3>
-                <p className="text-brand-text-muted text-sm mt-1">Simple, flat platform fees. Pricing will be confirmed when Protected Payments launches.</p>
-              </div>
-
-              {/* Pricing Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
-                
-                {/* Plan 1 */}
-                <div className="bg-brand-container border border-white/5 p-8 rounded-2xl flex flex-col justify-between">
-                  <div>
-                    <span className="font-mono text-xs text-brand-text-muted uppercase tracking-wider">CREATOR BASE</span>
-                    <h4 className="font-display text-3xl text-white font-bold mt-1 mb-4">Flat Platform Fee</h4>
-                    <p className="text-sm text-brand-text-muted leading-relaxed mb-6">
-                      For independent creatives who want to get paid securely with SideQuests Protected Payments.
-                    </p>
-                    
-                    <div className="flex items-baseline gap-1 mb-8">
-                      <span className="font-display text-5xl font-extrabold text-white">4%</span>
-                      <span className="text-xs text-brand-text-muted font-mono uppercase tracking-wider">of contract budget</span>
-                    </div>
-
-                    <ul className="space-y-3.5 mb-8 border-t border-white/5 pt-6">
-                      <li className="text-xs text-brand-text-muted flex items-center gap-2">
-                        <Verified className="w-4 h-4 text-brand-volt flex-shrink-0" />
-                        <span>Protected Payments on every milestone</span>
-                      </li>
-                      <li className="text-xs text-brand-text-muted flex items-center gap-2">
-                        <Verified className="w-4 h-4 text-brand-volt flex-shrink-0" />
-                        <span>Secure file delivery for every gig</span>
-                      </li>
-                      <li className="text-xs text-brand-text-muted flex items-center gap-2">
-                        <Verified className="w-4 h-4 text-brand-volt flex-shrink-0" />
-                        <span>Core disputes and mediation support access</span>
-                      </li>
-                    </ul>
-                  </div>
-
-                  <button 
-                    onClick={() => showToast('Creator Base subscription active by default!', 'info')}
-                    className="w-full border border-white/20 bg-white/5 hover:bg-white/10 text-white font-sans font-bold text-xs py-3.5 rounded-xl transition-all"
-                  >
-                    Active on Registration
-                  </button>
-                </div>
-
-                {/* Plan 2 */}
-                <div className="bg-brand-container-high border border-brand-volt/20 p-8 rounded-2xl flex flex-col justify-between relative shadow-lg shadow-brand-volt/5">
-                  <div className="absolute top-4 right-4 bg-brand-volt text-brand-bg font-mono text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 rounded-md">
-                    POPULAR
-                  </div>
-                  <div>
-                    <span className="font-mono text-xs text-brand-volt uppercase tracking-wider">COLLECTIVE PRO</span>
-                    <h4 className="font-display text-3xl text-white font-bold mt-1 mb-4">Infinite Autonomy</h4>
-                    <p className="text-sm text-brand-text-muted leading-relaxed mb-6">
-                      For busy creatives and gig providers who run lots of quests.
-                    </p>
-                    
-                    <div className="flex items-baseline gap-1 mb-8">
-                      <span className="font-display text-5xl font-extrabold text-white">$49</span>
-                      <span className="text-xs text-brand-text-muted font-mono uppercase tracking-wider">/ month</span>
-                    </div>
-
-                    <ul className="space-y-3.5 mb-8 border-t border-white/5 pt-6">
-                      <li className="text-xs text-white flex items-center gap-2">
-                        <Verified className="w-4 h-4 text-brand-volt flex-shrink-0" />
-                        <span className="font-medium">1.8% reduced transaction fee</span>
-                      </li>
-                      <li className="text-xs text-white flex items-center gap-2">
-                        <Verified className="w-4 h-4 text-brand-volt flex-shrink-0" />
-                        <span className="font-medium">More file storage for deliverables</span>
-                      </li>
-                      <li className="text-xs text-white flex items-center gap-2">
-                        <Verified className="w-4 h-4 text-brand-volt flex-shrink-0" />
-                        <span className="font-medium">Featured placement in search</span>
-                      </li>
-                      <li className="text-xs text-white flex items-center gap-2">
-                        <Verified className="w-4 h-4 text-brand-volt flex-shrink-0" />
-                        <span className="font-medium">Priority support</span>
-                      </li>
-                    </ul>
-                  </div>
-
-                  <button 
-                    onClick={() => showToast('Collective Pro is coming soon.', 'info')}
-                    className="w-full bg-brand-volt text-brand-bg font-sans font-extrabold text-xs py-3.5 rounded-xl hover:scale-[1.02] active:scale-95 transition-all shadow-md shadow-brand-volt/10 glow-btn"
-                  >
-                    Coming Soon
-                  </button>
-                </div>
-
-              </div>
-
-              {/* Fee Calculator */}
-              <div className="bg-brand-container border border-white/5 p-8 rounded-2xl max-w-2xl mx-auto">
-                <h4 className="font-display text-xl text-white font-bold mb-2">Platform Fee Estimator</h4>
-                <p className="text-xs text-brand-text-muted leading-relaxed mb-6">
-                  Enter a gig budget to see the platform fee on each plan.
-                </p>
-
-                <div className="space-y-5">
-                  <div>
-                    <label className="font-mono text-[10px] text-brand-text-muted uppercase tracking-wider block mb-2 font-semibold">Projected Gig Budget ($)</label>
-                    <input 
-                      type="number" 
-                      defaultValue="5000"
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        const el = document.getElementById('calc-total');
-                        const elPro = document.getElementById('calc-total-pro');
-                        const feeEl = document.getElementById('calc-fee');
-                        const feeElPro = document.getElementById('calc-fee-pro');
-                        if (el && elPro && feeEl && feeElPro) {
-                          const fee = val * 0.04;
-                          const feePro = val * 0.018;
-                          feeEl.innerText = `$${fee.toLocaleString(undefined, {maximumFractionDigits: 0})}`;
-                          feeElPro.innerText = `$${feePro.toLocaleString(undefined, {maximumFractionDigits: 0})}`;
-                          el.innerText = `$${(val + fee).toLocaleString(undefined, {maximumFractionDigits: 0})}`;
-                          elPro.innerText = `$${(val + feePro).toLocaleString(undefined, {maximumFractionDigits: 0})}`;
-                        }
-                      }}
-                      className="w-full bg-brand-bg border border-white/10 rounded-xl py-3 px-4 text-sm focus:border-brand-volt focus:outline-none text-white font-mono"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
-                    <div className="bg-white/5 p-4 rounded-xl border border-white/5">
-                      <span className="font-mono text-[9px] text-brand-text-muted uppercase block tracking-wider mb-1">Creator Base (4%)</span>
-                      <span id="calc-fee" className="block text-lg font-bold text-white font-mono">$200</span>
-                      <span className="text-[10px] text-brand-text-muted block mt-1">Total funded: <span id="calc-total" className="text-white font-semibold font-mono">$5,200</span></span>
-                    </div>
-
-                    <div className="bg-brand-volt/5 p-4 rounded-xl border border-brand-volt/10">
-                      <span className="font-mono text-[9px] text-brand-volt uppercase block tracking-wider mb-1 font-semibold">Collective Pro (1.8%)</span>
-                      <span id="calc-fee-pro" className="block text-lg font-bold text-brand-volt font-mono">$90</span>
-                      <span className="text-[10px] text-brand-text-muted block mt-1">Total funded: <span id="calc-total-pro" className="text-white font-semibold font-mono">$5,090</span></span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
+            <PricingSection onGetStarted={() => (currentUser ? handleStartCreateProfile(userProfile.accountType) : openAuth('signup'))} />
           )}
 
           {/* TASKS / GIG OPERATING SYSTEM CONSOLE VIEW */}
@@ -1392,6 +1291,10 @@ export default function App() {
                   }}
                 />
               ) : (
+                <>
+                {userProfile.accountType === 'artist' && (
+                  <PayoutsCard payoutsReady={!!userProfile.payoutsReady} showToast={showToast} />
+                )}
                 <ProfileView
                   profile={userProfile}
                   onEditProfile={() => setIsEditingProfile(true)}
@@ -1409,6 +1312,7 @@ export default function App() {
                   onGoogleSignIn={handleGoogleSignIn}
                   onGoogleSignOut={handleGoogleSignOut}
                 />
+                </>
               )}
             </motion.div>
           )}
