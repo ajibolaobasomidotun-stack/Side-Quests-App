@@ -57,7 +57,8 @@ import { INITIAL_USER_PROFILE, ARTIST_CATEGORIES, PROVIDER_CATEGORIES } from './
 import { ProfileCreator } from './components/ProfileCreator';
 import { ProfileView } from './components/ProfileView';
 import { PostQuestModal } from './components/PostQuestModal';
-import { SiteHeader, SiteFooter, MobileTabBar } from './components/SiteChrome';
+import { SiteHeader, SiteFooter, MobileTabBar, type Tab } from './components/SiteChrome';
+import { TermsPage, PrivacyPage } from './components/LegalPages';
 import { LandingHero, Disciplines, HowItWorks, BothSides, FoundingCreatives, PricingCalculator, FinalCTA } from './components/Landing';
 import { AuthModal } from './components/AuthModal';
 import { ApplyModal } from './components/ApplyModal';
@@ -88,7 +89,10 @@ import {
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'quests' | 'creatives' | 'learn' | 'pricing' | 'tasks' | 'profile'>('quests');
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const path = typeof window !== 'undefined' ? window.location.pathname : '/';
+    return path === '/terms' ? 'terms' : path === '/privacy' ? 'privacy' : 'quests';
+  });
   const [quests, setQuests] = useState<Quest[]>([]);
   const [artistProfiles, setArtistProfiles] = useState<UserProfile[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -480,7 +484,21 @@ export default function App() {
     showToast('Direct hiring arrives with Protected Payments. For now, post a quest and they can apply.', 'info');
   };
 
-  const goTab = (tab: 'quests' | 'creatives' | 'learn' | 'pricing' | 'tasks' | 'profile') => {
+  // Keep /terms and /privacy as real, shareable URLs; everything else lives at /.
+  useEffect(() => {
+    const want = activeTab === 'terms' ? '/terms' : activeTab === 'privacy' ? '/privacy' : '/';
+    if (window.location.pathname !== want) window.history.pushState(null, '', want + window.location.search);
+  }, [activeTab]);
+  useEffect(() => {
+    const onPop = () => {
+      const path = window.location.pathname;
+      setActiveTab(path === '/terms' ? 'terms' : path === '/privacy' ? 'privacy' : 'quests');
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const goTab = (tab: Tab) => {
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -882,6 +900,9 @@ export default function App() {
           )}
 
           {/* PRICING & FEES VIEW */}
+          {activeTab === 'terms' && <TermsPage onPrivacy={() => goTab('privacy')} />}
+          {activeTab === 'privacy' && <PrivacyPage onTerms={() => goTab('terms')} />}
+
           {activeTab === 'pricing' && (
             <PricingSection onGetStarted={() => (currentUser ? handleStartCreateProfile(userProfile.accountType) : openAuth('signup'))} />
           )}

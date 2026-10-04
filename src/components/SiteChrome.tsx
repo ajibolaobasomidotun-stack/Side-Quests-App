@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Avatar } from './Avatar';
 
-export type Tab = 'quests' | 'creatives' | 'learn' | 'pricing' | 'tasks' | 'profile';
+export type Tab = 'quests' | 'creatives' | 'learn' | 'pricing' | 'tasks' | 'profile' | 'terms' | 'privacy';
 
 type Nav = {
   activeTab: Tab;
@@ -226,7 +226,11 @@ export function SiteFooter({ nav, account }: { nav: Nav; account: Account }) {
             ])}
       </div>
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 border-t border-white/5 flex flex-col sm:flex-row justify-between gap-2 text-xs text-[#6E6E68]">
-        <span>© {new Date().getFullYear()} SideQuests</span>
+        <span className="flex flex-wrap gap-x-4 gap-y-1">
+          <span>© {new Date().getFullYear()} SideQuests</span>
+          <button onClick={() => nav.go('terms')} className="hover:text-white cursor-pointer">Terms</button>
+          <button onClick={() => nav.go('privacy')} className="hover:text-white cursor-pointer">Privacy</button>
+        </span>
         <span>Payments by Stripe · Photos: Unsplash</span>
       </div>
     </footer>
