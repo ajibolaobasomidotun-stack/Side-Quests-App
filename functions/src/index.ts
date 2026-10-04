@@ -360,3 +360,6 @@ export const approveMilestone = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (
   );
   return { transferId: transfer.id };
 });
+
+// Reviews and track record
+export { submitReview, releaseExpiredReviews, onContractCompleted } from './reviews.js';

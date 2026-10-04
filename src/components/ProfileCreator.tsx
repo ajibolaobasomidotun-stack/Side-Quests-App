@@ -6,11 +6,16 @@
 import React, { useRef, useState } from 'react';
 import { Avatar } from './Avatar';
 import { photoToAvatarDataUrl, ImageError } from '../lib/image';
+import { profileSocialLinks } from '../lib/social';
+import { deleteProofFiles } from '../lib/proof';
+import { SocialLinksEditor, ProofEditor } from './ProfileExtras';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   UserProfile, 
   AccountType, 
-  CategoryOption 
+  CategoryOption,
+  SocialLink,
+  ProofItem
 } from '../types';
 import { 
   ARTIST_CATEGORIES, 
@@ -39,7 +44,10 @@ import {
 
 interface ProfileCreatorProps {
   currentProfile: UserProfile;
-  onSaveProfile: (profile: UserProfile) => void;
+  /** Resolves true when the profile was saved. */
+  onSaveProfile: (profile: UserProfile) => boolean | void | Promise<boolean | void>;
+  /** Signed-in user's id, used for proof-of-work uploads. */
+  uid?: string;
   onCancel?: () => void;
   initialMode?: AccountType;
   onNavigateToExplore?: () => void;
@@ -48,6 +56,7 @@ interface ProfileCreatorProps {
 export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
   currentProfile,
   onSaveProfile,
+  uid,
   onCancel,
   initialMode,
   onNavigateToExplore
@@ -103,10 +112,10 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
   );
   const [newGearInput, setNewGearInput] = useState('');
 
-  const [spotifyLink, setSpotifyLink] = useState(currentProfile.portfolioLinks?.spotify || '');
-  const [soundcloudLink, setSoundcloudLink] = useState(currentProfile.portfolioLinks?.soundcloud || '');
-  const [instagramLink, setInstagramLink] = useState(currentProfile.portfolioLinks?.instagram || '');
-  const [websiteLink, setWebsiteLink] = useState(currentProfile.portfolioLinks?.website || '');
+  const [socialLinks, setSocialLinks] = useState<SocialLink[]>(() => profileSocialLinks(currentProfile));
+  const [proofItems, setProofItems] = useState<ProofItem[]>(currentProfile.proofItems || []);
+  // Files removed in the editor are deleted only after the profile saves.
+  const [removedProofPaths, setRemovedProofPaths] = useState<string[]>([]);
 
   // Gig Provider specific states
   const [organizationName, setOrganizationName] = useState(currentProfile.organizationName || '');
@@ -175,7 +184,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
   // Submit and Save
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!displayName.trim()) {
       setSaveError('Please add your name (or your business name) before publishing.');
       return;
@@ -201,12 +210,10 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
       availability: accountType === 'artist' ? availability : undefined,
       credits: accountType === 'artist' ? credits : undefined,
       gear: accountType === 'artist' ? gear : undefined,
-      portfolioLinks: accountType === 'artist' ? {
-        spotify: spotifyLink || undefined,
-        soundcloud: soundcloudLink || undefined,
-        instagram: instagramLink || undefined,
-        website: websiteLink || undefined
-      } : undefined,
+      socialLinks,
+      proofItems: accountType === 'artist'
+        ? proofItems.map((i) => ({ ...i, caption: i.caption.trim().slice(0, 140), isCover: !!i.isCover }))
+        : currentProfile.proofItems,
 
       organizationName: accountType === 'provider' ? organizationName : undefined,
       orgType: accountType === 'provider' ? orgType : undefined,
@@ -216,7 +223,12 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
       createdAt: currentProfile.createdAt || new Date().toISOString().split('T')[0]
     };
 
-    onSaveProfile(finalProfile);
+    const saved = await onSaveProfile(finalProfile);
+    if (saved !== false && removedProofPaths.length) {
+      const stillUsed = new Set(proofItems.map((i) => i.path));
+      deleteProofFiles(removedProofPaths.filter((p) => !stillUsed.has(p)));
+      setRemovedProofPaths([]);
+    }
   };
 
   const currentCategoryPool = accountType === 'artist' ? ARTIST_CATEGORIES : PROVIDER_CATEGORIES;
@@ -728,29 +740,6 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                     </div>
                   </div>
 
-                  {/* Portfolio links */}
-                  <div>
-                    <label className="block text-xs font-mono uppercase tracking-wider text-brand-text-muted mb-2 font-semibold">
-                      Portfolio Links (Optional)
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <input
-                        type="text"
-                        value={spotifyLink}
-                        onChange={(e) => setSpotifyLink(e.target.value)}
-                        placeholder="Portfolio / Behance / Spotify URL"
-                        className="w-full bg-brand-container-high border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-brand-text-muted/60 focus:outline-none focus:border-brand-volt"
-                      />
-                      <input
-                        type="text"
-                        value={soundcloudLink}
-                        onChange={(e) => setSoundcloudLink(e.target.value)}
-                        placeholder="YouTube / Vimeo / SoundCloud / Reel URL"
-                        className="w-full bg-brand-container-high border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-brand-text-muted/60 focus:outline-none focus:border-brand-volt"
-                      />
-                    </div>
-                  </div>
-
                 </div>
               )}
 
@@ -843,6 +832,22 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                   </div>
 
                 </div>
+              )}
+
+              <SocialLinksEditor links={socialLinks} onChange={setSocialLinks} />
+
+              {accountType === 'artist' && (
+                uid ? (
+                  <ProofEditor
+                    uid={uid}
+                    items={proofItems}
+                    onChange={setProofItems}
+                    onRemove={(path) => setRemovedProofPaths((p) => [...p, path])}
+                    skillOptions={selectedCategories.map((id) => ARTIST_CATEGORIES.find((c) => c.id === id)?.name || id)}
+                  />
+                ) : (
+                  <p className="text-xs text-brand-text-muted">Sign in to upload proof of your work.</p>
+                )
               )}
 
             </div>

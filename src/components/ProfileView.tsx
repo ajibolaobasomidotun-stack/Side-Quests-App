@@ -8,6 +8,9 @@ import { motion } from 'motion/react';
 import { Avatar } from './Avatar';
 import { UserProfile, Quest, Creative, AccountType } from '../types';
 import { ARTIST_CATEGORIES, PROVIDER_CATEGORIES } from '../profileData';
+import { profileSocialLinks } from '../lib/social';
+import { visibleProof } from '../lib/proof';
+import { SocialButtons, ProofGallery, TrackRecord } from './ProfileExtras';
 import { 
   Verified, 
   VerifiedUser, 
@@ -55,7 +58,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onGoogleSignIn,
   onGoogleSignOut
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'matches' | 'categories'>('overview');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'matches' | 'categories' | 'record'>('overview');
 
   const categoryPool = profile.accountType === 'artist' ? ARTIST_CATEGORIES : PROVIDER_CATEGORIES;
 
@@ -129,6 +132,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   </span>
                 )}
               </div>
+              <SocialButtons links={profileSocialLinks(profile)} className="mt-3" />
             </div>
           </div>
 
@@ -228,7 +232,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* SUB TABS NAVIGATION */}
-      <div className="flex items-center gap-2 mb-6 border-b border-white/10 pb-3">
+      <div className="flex items-center gap-2 mb-6 border-b border-white/10 pb-3 overflow-x-auto">
         <button
           onClick={() => setActiveSubTab('overview')}
           className={`px-4 py-2 rounded-xl text-xs font-mono font-medium transition-all ${
@@ -249,6 +253,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           }`}
         >
           Categories & Disciplines ({profile.selectedCategories.length})
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('record')}
+          className={`px-4 py-2 rounded-xl text-xs font-mono font-medium transition-all ${
+            activeSubTab === 'record'
+              ? 'bg-brand-volt/15 text-brand-volt border border-brand-volt/30 font-bold'
+              : 'text-brand-text-muted hover:text-white'
+          }`}
+        >
+          Track Record & Reviews
         </button>
 
         <button
@@ -279,6 +294,21 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 {profile.bio || 'No bio provided.'}
               </p>
             </div>
+
+            {profile.accountType === 'artist' && (
+              <div>
+                <h3 className="text-xs font-mono uppercase tracking-widest text-brand-text-muted mb-3 font-semibold">
+                  Proof of Work
+                </h3>
+                {visibleProof(profile.id, profile.proofItems).length > 0 ? (
+                  <ProofGallery uid={profile.id} items={profile.proofItems} />
+                ) : (
+                  <button onClick={onEditProfile} className="text-xs text-brand-volt hover:underline">
+                    Add photos or short videos of your work
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Profile Categories Tag Cloud */}
             <div>
@@ -355,6 +385,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
           </div>
 
+        </motion.div>
+      )}
+
+      {activeSubTab === 'record' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <TrackRecord uid={profile.id} role={profile.accountType === 'artist' ? 'creative' : 'provider'} verified={profile.verified} />
         </motion.div>
       )}
 

@@ -50,6 +50,9 @@ import {
 } from './components/Icons'; // Using simple fallback SVGs or Lucide/material-styled custom icons for ultimate reliability
 
 import { motion, AnimatePresence } from 'motion/react';
+import { profileSocialLinks } from './lib/social';
+import { visibleProof } from './lib/proof';
+import { SocialButtons, ProofGallery, TrackRecord } from './components/ProfileExtras';
 import { Creative, Quest, Article, UserProfile, AccountType, Application, Contract } from './types';
 import { LEARN_ARTICLES } from './data';
 import { GIG_CATEGORIES, GIG_CATEGORY_KEYS } from './categories';
@@ -283,7 +286,9 @@ export default function App() {
         gear: p.gear || [],
         hourlyRate: p.hourlyRate || 0,
         location: p.location || '',
-        verifiedCreditsCount: p.verified ? (p.credits?.length || 0) : 0
+        verifiedCreditsCount: p.verified ? (p.credits?.length || 0) : 0,
+        socialLinks: profileSocialLinks(p),
+        proofItems: p.proofItems
       };
     });
 
@@ -333,7 +338,7 @@ export default function App() {
     if (!currentUser) {
       showToast('Sign in to save your profile.', 'info');
       openAuth('signup');
-      return;
+      return false;
     }
     const profileToSave: UserProfile = { ...savedProfile, id: currentUser.uid, verified: userProfile.verified };
     try {
@@ -342,9 +347,11 @@ export default function App() {
       setHasProfile(true);
       setIsEditingProfile(false);
       showToast('Profile saved!', 'success');
+      return true;
     } catch (err) {
       console.warn('Could not save profile:', err);
       showToast('Could not save your profile. Please try again.', 'error');
+      return false;
     }
   };
 
@@ -996,6 +1003,7 @@ export default function App() {
                 <ProfileCreator
                   currentProfile={userProfile}
                   onSaveProfile={handleSaveUserProfile}
+                  uid={currentUser.uid}
                   onCancel={() => { if (hasProfile) setIsEditingProfile(false); else setActiveTab('quests'); }}
                   onNavigateToExplore={() => {
                     setActiveTab('quests');
@@ -1071,6 +1079,7 @@ export default function App() {
                   </div>
                   <p className="font-mono text-xs text-brand-volt uppercase tracking-wider mb-2">{selectedCreative.roleLabel}</p>
                   <p className="text-xs text-brand-text-muted mb-4">{selectedCreative.location} • Hourly rate: ${selectedCreative.hourlyRate}/hr</p>
+                  <SocialButtons links={selectedCreative.socialLinks || []} className="mb-4" />
                   <div className="flex flex-wrap gap-2">
                     {selectedCreative.tags.map((t, i) => (
                       <span key={i} className="bg-white/5 border border-white/10 text-[9px] font-mono uppercase tracking-wider px-2 py-1 rounded">
@@ -1085,6 +1094,18 @@ export default function App() {
                 <div>
                   <h5 className="font-mono text-[10px] text-brand-volt uppercase tracking-widest block mb-2 font-bold">About</h5>
                   <p className="text-xs text-brand-text-muted leading-relaxed">{selectedCreative.bio}</p>
+                </div>
+
+                {visibleProof(selectedCreative.id, selectedCreative.proofItems).length > 0 && (
+                  <div>
+                    <h5 className="font-mono text-[10px] text-brand-volt uppercase tracking-widest block mb-2.5 font-bold">Proof of work</h5>
+                    <ProofGallery uid={selectedCreative.id} items={selectedCreative.proofItems} />
+                  </div>
+                )}
+
+                <div>
+                  <h5 className="font-mono text-[10px] text-brand-volt uppercase tracking-widest block mb-2.5 font-bold">Track record & reviews</h5>
+                  <TrackRecord uid={selectedCreative.id} role="creative" verified={selectedCreative.verified} />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

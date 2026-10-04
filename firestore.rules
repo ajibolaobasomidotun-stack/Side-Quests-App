@@ -29,6 +29,12 @@ service cloud.firestore {
         || (incoming()[field] is string && incoming()[field].size() <= 150000);
     }
 
+    // Social links and proof of work are short lists on the profile.
+    function profileListsOk() {
+      return (!('socialLinks' in incoming()) || (incoming().socialLinks is list && incoming().socialLinks.size() <= 8))
+        && (!('proofItems' in incoming()) || (incoming().proofItems is list && incoming().proofItems.size() <= 8));
+    }
+
     function userDoc(userId) {
       return get(/databases/$(database)/documents/users/$(userId));
     }
@@ -55,14 +61,16 @@ service cloud.firestore {
         && !('verified' in incoming())
         && !('payoutsReady' in incoming())
         && !('email' in incoming())
-        && smallImageOrAbsent('avatarUrl');
+        && smallImageOrAbsent('avatarUrl')
+        && profileListsOk();
 
       allow update: if isSignedIn() && uid() == userId
         && incoming().accountType in ['artist', 'provider']
         && incoming().get('verified', false) == existing().get('verified', false)
         && incoming().get('payoutsReady', false) == existing().get('payoutsReady', false)
         && !('email' in incoming())
-        && smallImageOrAbsent('avatarUrl');
+        && smallImageOrAbsent('avatarUrl')
+        && profileListsOk();
 
       allow delete: if isSignedIn() && uid() == userId;
     }
@@ -229,7 +237,8 @@ service cloud.firestore {
           || (contractNow().clientUid == uid() && contractNow().status == 'active'
             && existing().status == 'submitted'
             && incoming().status == 'changes_requested'
-            && onlyChanges(['status', 'feedback', 'reviewedAt'])
+            && onlyChanges(['status', 'feedback', 'reviewedAt', 'revisionCount'])
+            && incoming().get('revisionCount', 0) == existing().get('revisionCount', 0) + 1
             && incoming().feedback is string && incoming().feedback.size() <= 2000)
         );
       }
@@ -249,6 +258,23 @@ service cloud.firestore {
 
         allow update, delete: if false;
       }
+    }
+
+    // ---------------------------------------------------------------
+    // Reviews — written only by the submitReview server function.
+    // Hidden until both sides have reviewed (or the window closes);
+    // the author can always see their own.
+    // ---------------------------------------------------------------
+    match /reviews/{reviewId} {
+      allow read: if existing().released == true
+        || (isSignedIn() && existing().reviewerUid == uid());
+      allow write: if false;
+    }
+
+    // Track record computed by the server from contracts and reviews.
+    match /publicStats/{userId} {
+      allow read: if true;
+      allow write: if false;
     }
 
     // ---------------------------------------------------------------

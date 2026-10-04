@@ -21,6 +21,7 @@ import {
   serverTimestamp,
   updateDoc,
   addDoc,
+  increment,
   type Timestamp
 } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -260,7 +261,8 @@ export async function reviewMilestone(contractId: string, milestoneId: string, a
   await updateDoc(doc(db, 'contracts', contractId, 'milestones', milestoneId), {
     status: (approve ? 'approved' : 'changes_requested') as MilestoneStatus,
     feedback: feedback.slice(0, 2000),
-    reviewedAt: nowIso()
+    reviewedAt: nowIso(),
+    ...(approve ? {} : { revisionCount: increment(1) })
   });
 }
 

@@ -123,7 +123,8 @@ await t('nobody can change the total once active', () => assertFails(updateDoc(d
 await t('studio cannot approve unsubmitted milestone', () => assertFails(updateDoc(doc(studio, 'contracts/q5_artist1/milestones/m1'), { status: 'approved', feedback: '', reviewedAt: 'z' })));
 await t('creative cannot approve own milestone', () => assertFails(updateDoc(doc(artist, 'contracts/q5_artist1/milestones/m1'), { status: 'approved', feedback: '', reviewedAt: 'z' })));
 await t('creative submits milestone', () => assertSucceeds(updateDoc(doc(artist, 'contracts/q5_artist1/milestones/m1'), { status: 'submitted', submissionNote: 'Selects attached', submittedAt: 'z' })));
-await t('studio requests changes', () => assertSucceeds(updateDoc(doc(studio, 'contracts/q5_artist1/milestones/m1'), { status: 'changes_requested', feedback: 'Brighter please', reviewedAt: 'z' })));
+await t('changes request must count the revision', () => assertFails(updateDoc(doc(studio, 'contracts/q5_artist1/milestones/m1'), { status: 'changes_requested', feedback: 'Brighter please', reviewedAt: 'z' })));
+await t('studio requests changes', () => assertSucceeds(updateDoc(doc(studio, 'contracts/q5_artist1/milestones/m1'), { status: 'changes_requested', feedback: 'Brighter please', reviewedAt: 'z', revisionCount: 1 })));
 await t('creative resubmits', () => assertSucceeds(updateDoc(doc(artist, 'contracts/q5_artist1/milestones/m1'), { status: 'submitted', submissionNote: 'Brighter now', submittedAt: 'z2' })));
 await t('studio cannot approve directly (money moves server-side)', () => assertFails(updateDoc(doc(studio, 'contracts/q5_artist1/milestones/m1'), { status: 'approved', feedback: 'Great', reviewedAt: 'z2' })));
 await t('studio cannot fake a payout record', () => assertFails(updateDoc(doc(studio, 'contracts/q5_artist1'), { releasedAmountCents: 0, updatedAt: 'z' })));
@@ -138,6 +139,25 @@ await t('file message in own folder ok', () => assertSucceeds(addDoc(collection(
 await t('outsider cannot read messages', () => assertFails(getDocs(collection(artist2, 'contracts/q5_artist1/messages'))));
 await t('chat preview update allowed', () => assertSucceeds(updateDoc(doc(artist, 'contracts/q5_artist1'), { lastMessageAt: 'z', lastMessagePreview: 'hi', lastMessageBy: 'artist1' })));
 await t('studio completes contract', () => assertSucceeds(updateDoc(doc(studio, 'contracts/q5_artist1'), { status: 'completed', updatedAt: 'z' })));
+
+// --- profile lists
+await t('social links saved on profile', () => assertSucceeds(updateDoc(doc(artist, 'users/artist1'), { accountType: 'artist', socialLinks: [{ platform: 'instagram', handle: 'a' }] })));
+await t('max 8 proof items', () => assertFails(updateDoc(doc(artist, 'users/artist1'), { accountType: 'artist', proofItems: Array.from({ length: 9 }, (_, i) => ({ id: String(i) })) })));
+
+// --- reviews and track record (server-written)
+await env.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'reviews/q5_artist1_studio1'), { reviewerUid: 'studio1', revieweeUid: 'artist1', released: false, overall: 5 });
+  await setDoc(doc(db, 'reviews/q4_artist1_studio1'), { reviewerUid: 'studio1', revieweeUid: 'artist1', released: true, overall: 4 });
+  await setDoc(doc(db, 'publicStats/artist1'), { updatedAt: 'x' });
+});
+await t('reviewee cannot read a hidden review', () => assertFails(getDoc(doc(artist, 'reviews/q5_artist1_studio1'))));
+await t('author can read own hidden review', () => assertSucceeds(getDoc(doc(studio, 'reviews/q5_artist1_studio1'))));
+await t('anyone reads released reviews', () => assertSucceeds(getDoc(doc(anon, 'reviews/q4_artist1_studio1'))));
+await t('query released reviews', () => assertSucceeds(getDocs(query(collection(anon, 'reviews'), where('revieweeUid', '==', 'artist1'), where('released', '==', true)))));
+await t('cannot write reviews from the app', () => assertFails(setDoc(doc(studio, 'reviews/q9_artist1_studio1'), { reviewerUid: 'studio1', released: true })));
+await t('anyone reads track record', () => assertSucceeds(getDoc(doc(anon, 'publicStats/artist1'))));
+await t('cannot write track record', () => assertFails(setDoc(doc(artist, 'publicStats/artist1'), { updatedAt: 'y' })));
 
 // --- bookmarks
 await t('save a bookmark', () => assertSucceeds(setDoc(doc(artist, 'bookmarks/artist1_q1'), { userId: 'artist1', questId: 'q1', createdAt: 'x' })));

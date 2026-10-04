@@ -22,6 +22,8 @@ export interface Creative {
   hourlyRate: number;
   location: string;
   verifiedCreditsCount: number;
+  socialLinks?: SocialLink[];
+  proofItems?: ProofItem[];
 }
 
 export interface Quest {
@@ -124,6 +126,29 @@ export interface CategoryOption {
   iconName?: string;
 }
 
+export type SocialPlatform =
+  | 'instagram' | 'x' | 'tiktok' | 'youtube' | 'linkedin' | 'behance' | 'soundcloud' | 'website';
+
+export interface SocialLink {
+  platform: SocialPlatform;
+  /** Username for social platforms, full https URL for 'website'. */
+  handle: string;
+}
+
+export interface ProofItem {
+  id: string;
+  type: 'image' | 'video';
+  /** Download URL in our Storage bucket. */
+  url: string;
+  /** Storage path: users/{uid}/proof/{id}.{ext} */
+  path: string;
+  caption: string;
+  skill: string;
+  durationSec?: number;
+  isCover?: boolean;
+  createdAt: string;
+}
+
 export interface UserProfile {
   id: string;
   accountType: AccountType;
@@ -147,6 +172,10 @@ export interface UserProfile {
     instagram?: string;
     website?: string;
   };
+  /** Social accounts shown as buttons on the profile (any account type). */
+  socialLinks?: SocialLink[];
+  /** Photos and short videos that prove the creative's skills (max 8). */
+  proofItems?: ProofItem[];
   
   // Gig Provider specific
   organizationName?: string;
@@ -198,6 +227,10 @@ export interface Contract {
   fundedAmountCents?: number;
   feeAmountCents?: number;
   releasedAmountCents?: number;
+  /** Set by the server: when the contract was marked complete. */
+  completedAt?: string;
+  /** Set by the server: uids that have left a review for this contract. */
+  reviewedBy?: string[];
   createdAt: string;
   updatedAt?: string;
   lastMessageAt?: string;
@@ -220,6 +253,8 @@ export interface Milestone {
   /** Set by the server when the milestone's money is released. */
   transferId?: string;
   paidAt?: string;
+  /** How many times the gig provider asked for changes. */
+  revisionCount?: number;
 }
 
 export interface ContractFile {
@@ -237,4 +272,56 @@ export interface ContractMessage {
   text: string;
   file?: ContractFile;
   createdAt: Date | null;
+}
+
+
+// ---------------------------------------------------------------------------
+// Reviews and track record (written by the server only)
+// ---------------------------------------------------------------------------
+
+export type ReviewerRole = 'provider' | 'creative';
+
+export interface Review {
+  id: string;
+  contractId: string;
+  questTitle: string;
+  reviewerUid: string;
+  reviewerName: string;
+  reviewerAvatar?: string;
+  /** Role of the person writing the review. */
+  reviewerRole: ReviewerRole;
+  revieweeUid: string;
+  overall: number;
+  categories: Record<string, number>;
+  tags: string[];
+  note: string;
+  wouldWorkAgain: boolean;
+  createdAt: string;
+  released: boolean;
+  releasedAt?: string;
+}
+
+export type TrackLevel = 'New' | 'Rising' | 'Trusted' | 'Top rated';
+
+export interface RoleStats {
+  completedContracts: number;
+  ratingAvg: number | null;
+  ratingCount: number;
+  categoryAvgs: Record<string, number>;
+  tagCounts: Record<string, number>;
+  wouldWorkAgainPct: number | null;
+  /** Creatives: distinct clients who hired them more than once. Providers: creatives they rehired. */
+  repeatPartners: number;
+  distinctPartners: number;
+  avgRevisionRounds: number | null;
+  /** Providers only: average hours from submission to approval. */
+  avgApprovalHours: number | null;
+  level: TrackLevel;
+  badges: { id: string; name: string; rule: string }[];
+}
+
+export interface PublicStats {
+  asCreative?: RoleStats;
+  asProvider?: RoleStats;
+  updatedAt: string;
 }

@@ -123,6 +123,8 @@ export function docToProfile(uid: string, d: Record<string, any>): UserProfile {
     experienceLevel: d.experienceLevel,
     availability: d.availability,
     portfolioLinks: d.portfolioLinks,
+    socialLinks: Array.isArray(d.socialLinks) ? d.socialLinks.slice(0, 8) : undefined,
+    proofItems: Array.isArray(d.proofItems) ? d.proofItems.slice(0, 8) : undefined,
     organizationName: d.organizationName,
     orgType: d.orgType,
     budgetTier: d.budgetTier,
@@ -151,7 +153,9 @@ export async function saveUserProfile(uid: string, profile: UserProfile, isNew: 
   });
   // Remove legacy fields written by the AI Studio prototype (email must not be public).
   const legacyCleanup = isNew ? {} : {
-    email: deleteField(), name: deleteField(), photoURL: deleteField(), skills: deleteField()
+    email: deleteField(), name: deleteField(), photoURL: deleteField(), skills: deleteField(),
+    // Replaced by socialLinks (ProfileCreator migrates the old values).
+    portfolioLinks: deleteField()
   };
   await setDoc(doc(db, "users", uid), { ...payload, ...legacyCleanup }, { merge: true });
 }

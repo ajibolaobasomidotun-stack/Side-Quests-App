@@ -101,6 +101,7 @@ export function TermsPage({ onPrivacy }: { onPrivacy: () => void }) {
         <li><B>We don’t employ creatives.</B> Creatives are independent and decide how, when and where they do the work. Nothing on SideQuests creates an employment, partnership or agency relationship between us and any user, or between users.</li>
         <li><B>We don’t guarantee work, results or quality.</B> We don’t promise that a quest will be filled, that a creative will be hired, or that the work delivered will meet expectations. Each user is responsible for checking who they work with.</li>
         <li><B>Verified badges.</B> A verified badge means our team has reviewed that creative’s identity and portfolio at a point in time. It isn’t a guarantee of their future work or conduct.</li>
+        <li><B>Reviews and track record.</B> After a contract is completed, the gig provider and the creative can each review the other within 14 days. Only people on a completed, paid contract can leave a review. Reviews stay hidden until both have been submitted or the 14 days pass, and then appear on profiles. Reviews must be honest and about the work; we may remove reviews that are abusive, fake, include personal information, or try to pressure the other person. Track record figures (such as completed contracts and approval speed) are calculated automatically from activity on SideQuests.</li>
         <li><B>We’re not a bank.</B> Protected Payments is a payment feature of a marketplace. It is not a banking, money transmission or escrow service.</li>
       </UL>
 
@@ -214,8 +215,9 @@ export function PrivacyPage({ onTerms }: { onTerms: () => void }) {
       <P><B>Information you give us</B></P>
       <UL>
         <li><B>Account details:</B> your email address and password, or your Google account’s name, email address and profile photo if you sign in with Google. Passwords are handled by our sign-in provider (Google Firebase); we never see them in plain text.</li>
-        <li><B>Profile:</B> the details you add to your profile, such as your name, handle, headline, bio, location, profile picture, disciplines and skills, rate, credits, gear, availability and portfolio links. Gig providers may also add an organisation name, type and hiring goals.</li>
+        <li><B>Profile:</B> the details you add to your profile, such as your name, handle, headline, bio, location, profile picture, disciplines and skills, rate, credits, gear, availability and social media links, and photos or videos of your work. Gig providers may also add an organisation name, type and hiring goals.</li>
         <li><B>Marketplace activity:</B> quests you post, applications and proposals you send (including your price), quests you bookmark, and contracts you’re part of, including milestones, messages and files you upload.</li>
+        <li><B>Reviews:</B> reviews you leave and receive after a contract (star ratings, tags, notes and whether you’d work together again). Once released, reviews are public on the reviewed person’s profile with the reviewer’s name and the quest title.</li>
         <li><B>Messages to us:</B> anything you send when you contact us.</li>
       </UL>
       <P><B>Payment information</B></P>

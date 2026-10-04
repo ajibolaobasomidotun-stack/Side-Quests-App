@@ -20,6 +20,8 @@ import {
   paymentErrorMessage
 } from '../lib/contracts';
 import { Avatar } from './Avatar';
+import { ReviewCard } from './ReviewModal';
+import { REVIEW_WINDOW_DAYS } from '../lib/reviews';
 import { AttachFile, Send, CheckCircle, Close, Plus, Trash2, ChevronLeft, Download, Work } from './Icons';
 
 type Toast = (message: string, type?: 'success' | 'info' | 'error') => void;
@@ -260,6 +262,8 @@ const ContractWorkspace: React.FC<WorkspaceProps> = ({ contract, uid, profile, o
         onComplete={() => act(() => completeContract(contract), 'Marked the contract as complete.', 'Contract completed!')}
       />
 
+      <ReviewCard contract={contract} uid={uid} showToast={showToast} />
+
       {/* Milestones */}
       {isClient && contract.status === 'setup' ? (
         <PlanEditor contractId={contract.id} milestones={milestones} showToast={showToast} />
@@ -445,7 +449,7 @@ const StatusBanner: React.FC<BannerProps> = (p) => {
     case 'completed':
       return box(<>
         <p className="text-sm text-white font-semibold">Contract completed</p>
-        <p className="text-xs text-brand-text-muted mt-1">All milestones were approved. Files and messages stay available here.</p>
+        <p className="text-xs text-brand-text-muted mt-1">All milestones were approved. Files and messages stay available here. You each have {REVIEW_WINDOW_DAYS} days to leave a review.</p>
       </>, 'volt');
 
     case 'cancelled':
