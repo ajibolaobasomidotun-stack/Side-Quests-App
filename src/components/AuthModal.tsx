@@ -8,6 +8,7 @@ import {
   resetPassword,
   authErrorMessage
 } from '../lib/firebase';
+import { AGE_CONFIRM_LABEL, rememberAgeConfirmed } from '../lib/age';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -23,6 +24,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, initialMode = 'sig
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [isAdult, setIsAdult] = useState(false);
+
+  // New accounts must confirm they're 18+ before creating an account (email or Google).
+  const needsAge = mode === 'signup';
+  const ageOk = () => {
+    if (!needsAge) return true;
+    if (!isAdult) {
+      setError('You need to be 18 or older to use SideQuests. Please confirm your age to continue.');
+      return false;
+    }
+    rememberAgeConfirmed();
+    return true;
+  };
 
   React.useEffect(() => {
     if (isOpen) {
@@ -54,6 +68,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, initialMode = 'sig
     e.preventDefault();
     if (mode === 'signup') {
       if (!name.trim()) { setError('Please enter your name.'); return; }
+      if (!ageOk()) return;
       run(() => signUpWithEmail(name, email.trim(), password));
     } else if (mode === 'signin') {
       run(() => signInWithEmail(email.trim(), password));
@@ -88,12 +103,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, initialMode = 'sig
             {mode === 'signup' ? 'Create your account' : mode === 'signin' ? 'Welcome back' : 'Reset your password'}
           </h3>
 
+          {needsAge && (
+            <label className="flex items-start gap-3 mb-4 p-3 rounded-xl border border-white/10 bg-brand-bg/60 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isAdult}
+                onChange={(e) => { setIsAdult(e.target.checked); setError(null); }}
+                className="mt-0.5 w-4 h-4 accent-[#C3F400] flex-shrink-0"
+              />
+              <span className="text-xs text-white leading-relaxed">
+                {AGE_CONFIRM_LABEL} <span className="text-brand-text-muted">SideQuests is only for adults.</span>
+              </span>
+            </label>
+          )}
+
           {mode !== 'reset' && (
             <>
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => run(() => signInWithGoogle())}
+                onClick={() => { if (ageOk()) run(() => signInWithGoogle()); }}
                 className="w-full flex items-center justify-center gap-2 bg-white text-brand-bg font-sans font-bold text-sm py-3 rounded-xl hover:bg-white/90 transition-all disabled:opacity-60"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">

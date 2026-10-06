@@ -185,6 +185,10 @@ export interface UserProfile {
   activeQuestsCount?: number;
   hiringGoals?: string[];
 
+  /** The person confirmed they're 18 or older (required for every account). */
+  ageConfirmed?: boolean;
+  ageConfirmedAt?: string;
+
   /** Set only by a SideQuests admin, never by the user. */
   verified?: boolean;
   /** Set by the server once Stripe payouts are ready (creatives). */

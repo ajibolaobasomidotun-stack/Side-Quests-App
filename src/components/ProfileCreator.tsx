@@ -9,6 +9,7 @@ import { photoToAvatarDataUrl, ImageError } from '../lib/image';
 import { profileSocialLinks } from '../lib/social';
 import { deleteProofFiles } from '../lib/proof';
 import { SocialLinksEditor, ProofEditor } from './ProfileExtras';
+import { AGE_CONFIRM_LABEL, ageConfirmedThisSession } from '../lib/age';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   UserProfile, 
@@ -183,6 +184,20 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
 
   // Submit and Save
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Age gate: required once per account; pre-ticked if they confirmed on the sign-up form.
+  const ageAlreadyRecorded = currentProfile.ageConfirmed === true;
+  const [isAdult, setIsAdult] = useState<boolean>(ageAlreadyRecorded || ageConfirmedThisSession());
+  const ageCheckbox = ageAlreadyRecorded ? null : (
+    <label className="flex items-start gap-3 p-3 rounded-xl border border-white/10 bg-brand-bg/60 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={isAdult}
+        onChange={(e) => { setIsAdult(e.target.checked); setSaveError(null); }}
+        className="mt-0.5 w-4 h-4 accent-[#C3F400] flex-shrink-0"
+      />
+      <span className="text-xs text-white leading-relaxed">{AGE_CONFIRM_LABEL} <span className="text-brand-text-muted">SideQuests is only for adults.</span></span>
+    </label>
+  );
 
   const handleSave = async () => {
     if (!displayName.trim()) {
@@ -191,6 +206,10 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
     }
     if (selectedCategories.length === 0) {
       setSaveError('Pick at least one category so the right people can find you.');
+      return;
+    }
+    if (!isAdult) {
+      setSaveError('You need to be 18 or older to use SideQuests. Please confirm your age to continue.');
       return;
     }
     setSaveError(null);
@@ -219,6 +238,9 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
       orgType: accountType === 'provider' ? orgType : undefined,
       budgetTier: accountType === 'provider' ? budgetTier : undefined,
       hiringGoals: accountType === 'provider' ? hiringGoals : undefined,
+
+      ageConfirmed: true,
+      ageConfirmedAt: currentProfile.ageConfirmedAt || new Date().toISOString(),
 
       createdAt: currentProfile.createdAt || new Date().toISOString().split('T')[0]
     };
@@ -948,6 +970,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                   <ArrowForward className="w-4 h-4" />
                 </button>
 
+                {ageCheckbox}
                 <button
                   onClick={handleSave}
                   className="w-full bg-brand-volt text-brand-bg hover:scale-[1.02] active:scale-95 font-sans font-bold text-xs py-3.5 rounded-xl transition-all shadow-lg shadow-brand-volt/10 flex items-center justify-center gap-2"
@@ -1105,6 +1128,7 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
                   {saveError ? <span className="text-red-400 normal-case">{saveError}</span> : 'Review your details, then publish.'}
                 </span>
 
+                {ageCheckbox}
                 <button
                   onClick={handleSave}
                   className="w-full sm:w-auto bg-brand-volt text-brand-bg font-sans font-bold text-xs px-6 py-3 rounded-xl hover:scale-105 transition-all shadow-lg shadow-brand-volt/10 flex items-center justify-center gap-2"

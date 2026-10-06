@@ -129,6 +129,8 @@ export function docToProfile(uid: string, d: Record<string, any>): UserProfile {
     orgType: d.orgType,
     budgetTier: d.budgetTier,
     hiringGoals: d.hiringGoals || [],
+    ageConfirmed: d.ageConfirmed === true,
+    ageConfirmedAt: typeof d.ageConfirmedAt === 'string' ? d.ageConfirmedAt : undefined,
     verified: d.verified === true,
     payoutsReady: d.payoutsReady === true,
     createdAt: d.createdAt || nowIso()

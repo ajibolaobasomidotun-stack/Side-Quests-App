@@ -62,7 +62,9 @@ service cloud.firestore {
         && !('payoutsReady' in incoming())
         && !('email' in incoming())
         && smallImageOrAbsent('avatarUrl')
-        && profileListsOk();
+        && profileListsOk()
+        // Age gate: only adults can create a profile.
+        && incoming().ageConfirmed == true;
 
       allow update: if isSignedIn() && uid() == userId
         && incoming().accountType in ['artist', 'provider']
@@ -70,7 +72,9 @@ service cloud.firestore {
         && incoming().get('payoutsReady', false) == existing().get('payoutsReady', false)
         && !('email' in incoming())
         && smallImageOrAbsent('avatarUrl')
-        && profileListsOk();
+        && profileListsOk()
+        // Once confirmed, the age confirmation can't be removed.
+        && (existing().get('ageConfirmed', false) != true || incoming().ageConfirmed == true);
 
       allow delete: if isSignedIn() && uid() == userId;
     }

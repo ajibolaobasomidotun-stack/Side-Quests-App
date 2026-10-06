@@ -32,10 +32,12 @@ const app = (over = {}) => ({
 });
 
 // --- users
-await t('studio creates own profile as provider', () => assertSucceeds(setDoc(doc(studio, 'users/studio1'), { accountType: 'provider', displayName: 'Studio One' })));
-await t('artist creates own profile', () => assertSucceeds(setDoc(doc(artist, 'users/artist1'), { accountType: 'artist', displayName: 'Artist One' })));
-await t('artist2 creates own profile', () => assertSucceeds(setDoc(doc(artist2, 'users/artist2'), { accountType: 'artist', displayName: 'Artist Two' })));
+await t('cannot create a profile without confirming 18+', () => assertFails(setDoc(doc(studio, 'users/studio1'), { accountType: 'provider', displayName: 'Studio One' })));
+await t('studio creates own profile as provider', () => assertSucceeds(setDoc(doc(studio, 'users/studio1'), { accountType: 'provider', displayName: 'Studio One', ageConfirmed: true })));
+await t('artist creates own profile', () => assertSucceeds(setDoc(doc(artist, 'users/artist1'), { accountType: 'artist', displayName: 'Artist One', ageConfirmed: true })));
+await t('artist2 creates own profile', () => assertSucceeds(setDoc(doc(artist2, 'users/artist2'), { accountType: 'artist', displayName: 'Artist Two', ageConfirmed: true })));
 await t('cannot create profile with verified flag', () => assertFails(setDoc(doc(artist, 'users/artist1'), { accountType: 'artist', verified: true })));
+await t('cannot remove the age confirmation', () => assertFails(updateDoc(doc(artist, 'users/artist1'), { accountType: 'artist', ageConfirmed: false })));
 await t('cannot self-verify on update', () => assertFails(updateDoc(doc(artist, 'users/artist1'), { verified: true })));
 await t('cannot store email in public profile', () => assertFails(updateDoc(doc(artist, 'users/artist1'), { email: 'a@b.c' })));
 await t('cannot edit someone else\'s profile', () => assertFails(updateDoc(doc(artist, 'users/studio1'), { displayName: 'hacked' })));
