@@ -8,14 +8,13 @@
  *      US bank account first, card also accepted).
  *   3. Stripe confirms the payment by webhook → contract becomes active.
  *   4. Each time the gig provider approves a milestone, that milestone's amount
- *      is transferred to the creative's connected account. The 3% platform
- *      fee is worked out on the contract total and deducted once, from the
- *      final milestone payout. SideQuests keeps the fee.
+ *      minus the 3% platform fee is transferred to the creative's connected
+ *      account. SideQuests keeps the fee.
  *
- * Older fee models still honoured for contracts funded under them (feeModel):
- *   'provider' – gig provider paid 3% on top at checkout; creative paid in full.
- *   'creative' – 3% deducted from every milestone payout.
- *   'creative_total' – current: 3% of the total, deducted from the final payout.
+ * Fee models, stored per contract as feeModel when it's funded:
+ *   'creative' – current: 3% deducted from every milestone payout.
+ *   'provider' – older: gig provider paid 3% on top at checkout; creative paid in full.
+ *   'creative_total' – briefly used: 3% of the total, deducted from the final payout.
  *
  * Every money-related state change happens here, never in the browser;
  * firestore.rules blocks clients from writing the fields set below.
@@ -37,7 +36,7 @@ const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
 const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
 const APP_URL = defineString('APP_URL', { default: 'https://sidequests-f6394.web.app' });
 
-/** Platform fee, charged to the creative on the contract total. */
+/** Platform fee, deducted from the creative's payout for each milestone. */
 const PLATFORM_FEE_RATE = 0.03;
 
 let stripeClient: Stripe | null = null;
@@ -191,7 +190,7 @@ export const createContractCheckout = onCall({ secrets: [STRIPE_SECRET_KEY] }, a
       metadata: { contractId, clientUid: uid, creativeUid: c.creativeUid }
     },
     // feeCents is 0: the gig provider pays only the contract total.
-    metadata: { contractId, amountCents: String(amount), feeCents: '0', feeModel: 'creative_total' },
+    metadata: { contractId, amountCents: String(amount), feeCents: '0', feeModel: 'creative' },
     success_url: `${base}/?contract=${encodeURIComponent(contractId)}&checkout=success`,
     cancel_url: `${base}/?contract=${encodeURIComponent(contractId)}&checkout=cancelled`
   });
@@ -331,7 +330,7 @@ export const approveMilestone = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (
   if (c.feeModel === 'creative') {
     fee = payoutFeeCents(amount);
   } else if (c.feeModel === 'creative_total') {
-    // 3% of the whole contract, taken once from the final payout.
+    // Contracts funded while the fee was taken once from the final payout.
     const all = await cRef.collection('milestones').get();
     const isFinal = all.docs.every((d) => d.id === milestoneId || d.get('status') === 'approved');
     if (isFinal) {

@@ -248,7 +248,7 @@ export function HowItWorks() {
   const go = (i: number, keepPlaying: boolean) => {
     start.current = Date.now();
     setElapsed(0);
-    setReleased(i === 3 && reduce ? 1500 : 0);
+    setReleased(i === 3 && reduce ? 1455 : 0);
     setStep(i);
     if (!keepPlaying) setPlaying(false);
   };
@@ -258,7 +258,7 @@ export function HowItWorks() {
       const e = Date.now() - start.current;
       if (auto && e > STEP_MS) { go((step + 1) % 4, true); return; }
       setElapsed(Math.min(1, e / STEP_MS));
-      if (step === 3) setReleased(Math.round(Math.min(1, e / 900) * 1500 * 100) / 100);
+      if (step === 3) setReleased(Math.round(Math.min(1, e / 900) * 1455 * 100) / 100);
     }, 50);
     return () => window.clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -361,7 +361,7 @@ export function HowItWorks() {
           )}
           {step === 3 && (
             <div className="flex items-center justify-between p-4 rounded-2xl bg-brand-volt text-brand-bg">
-              <div><span className="block text-xs font-semibold opacity-70">Released to your bank</span><span className="font-mono text-2xl font-semibold">+{money(released)}</span></div>
+              <div><span className="block text-xs font-semibold opacity-70">Released to your bank, after the 3% fee</span><span className="font-mono text-2xl font-semibold">+{money(released)}</span></div>
               <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#0E0E0E" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></svg>
             </div>
           )}
@@ -457,7 +457,7 @@ export function PricingCalculator() {
       <div>
         <Eyebrow>Simple pricing</Eyebrow>
         <h3 className="font-display text-4xl md:text-5xl text-white font-semibold mt-3">Free to join. <span className="text-brand-volt italic">3%</span> when you get paid.</h3>
-        <p className="mt-4 text-brand-text-muted max-w-md">Gig providers pay the agreed amount and nothing more. A flat 3% of the total comes off the creative’s final payout, so they keep 97% of their rate.</p>
+        <p className="mt-4 text-brand-text-muted max-w-md">Gig providers pay the agreed amount and nothing more. A flat 3% comes out of each payout, so creatives keep 97% of their rate.</p>
       </div>
       <div className="p-6 sm:p-8 rounded-3xl border border-white/10 bg-[#141414]">
         <label htmlFor="lp-budget" className="flex justify-between text-sm text-brand-text-muted">
