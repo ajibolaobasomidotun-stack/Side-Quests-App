@@ -12,8 +12,8 @@ export const PricingSection: React.FC<{ onGetStarted: () => void }> = ({ onGetSt
 
   const steps = [
     ['Agree the milestones', 'The gig provider and creative agree what will be delivered, and what each milestone is worth.'],
-    ['Pay up front', 'The gig provider pays the full amount plus the 3% fee. The money is held by SideQuests Protected Payments.'],
-    ['Approve and release', 'As each milestone is approved, its payment is released to the creative’s bank account.']
+    ['Pay up front', 'The gig provider pays the agreed amount, with no fees on top. The money is held by SideQuests Protected Payments.'],
+    ['Approve and release', 'As each milestone is approved, its payment, less the 3% fee, is released to the creative’s bank account.']
   ];
 
   return (
@@ -28,10 +28,10 @@ export const PricingSection: React.FC<{ onGetStarted: () => void }> = ({ onGetSt
           <span className="font-mono text-xs text-brand-volt uppercase tracking-wider">Platform fee</span>
           <div className="flex items-baseline gap-2 mt-2 mb-2">
             <span className="font-display text-6xl font-extrabold text-white">3%</span>
-            <span className="text-xs text-brand-text-muted font-mono uppercase tracking-wider">paid by the gig provider</span>
+            <span className="text-xs text-brand-text-muted font-mono uppercase tracking-wider">of what the creative earns</span>
           </div>
           <p className="text-sm text-brand-text-muted leading-relaxed mb-6">
-            Creatives keep 100% of their agreed rate. The fee is added on top when the gig provider pays for a contract.
+            Gig providers pay the agreed amount and nothing more. The 3% fee comes out of each milestone payout, so creatives keep 97% of their rate.
           </p>
           <ul className="space-y-3 border-t border-white/5 pt-6">
             {[
@@ -66,8 +66,8 @@ export const PricingSection: React.FC<{ onGetStarted: () => void }> = ({ onGetSt
           <div className="mt-5 space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-brand-text-muted">Contract amount</span><span className="text-white font-mono">{fmt(amount)}</span></div>
             <div className="flex justify-between"><span className="text-brand-text-muted">Platform fee (3%)</span><span className="text-white font-mono">{fmt(fee)}</span></div>
-            <div className="flex justify-between border-t border-white/10 pt-2"><span className="text-white font-semibold">Gig provider pays</span><span className="text-brand-volt font-mono font-bold">{fmt(amount + fee)}</span></div>
-            <div className="flex justify-between"><span className="text-white font-semibold">Creative receives</span><span className="text-brand-volt font-mono font-bold">{fmt(amount)}</span></div>
+            <div className="flex justify-between border-t border-white/10 pt-2"><span className="text-white font-semibold">Gig provider pays</span><span className="text-brand-volt font-mono font-bold">{fmt(amount)}</span></div>
+            <div className="flex justify-between"><span className="text-white font-semibold">Creative receives</span><span className="text-brand-volt font-mono font-bold">{fmt(Math.max(0, amount - fee))}</span></div>
           </div>
           <p className="text-[11px] text-brand-text-muted mt-5 leading-relaxed">
             Paying by US bank account keeps costs low for everyone. Card payments are also accepted.

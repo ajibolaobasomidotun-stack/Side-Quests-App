@@ -4,11 +4,15 @@
  * Money flow ("separate charges and transfers"):
  *   1. A creative sets up payouts once (Stripe-hosted onboarding, connected account).
  *   2. After the creative accepts a contract's terms, the gig provider pays
- *      contract total + 3% platform fee through Stripe Checkout
- *      (US bank account first, card also accepted).
+ *      the contract total through Stripe Checkout (no fee on top;
+ *      US bank account first, card also accepted).
  *   3. Stripe confirms the payment by webhook → contract becomes active.
  *   4. Each time the gig provider approves a milestone, that milestone's amount
- *      is transferred to the creative's connected account.
+ *      minus the 3% platform fee is transferred to the creative's connected
+ *      account. SideQuests keeps the fee.
+ *
+ * Contracts paid before the fee moved to the creative (checkout metadata
+ * feeCents > 0) keep the old model: the creative receives the full amount.
  *
  * Every money-related state change happens here, never in the browser;
  * firestore.rules blocks clients from writing the fields set below.
@@ -30,7 +34,7 @@ const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
 const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
 const APP_URL = defineString('APP_URL', { default: 'https://sidequests-f6394.web.app' });
 
-/** Platform fee paid by the gig provider on top of the contract total. */
+/** Platform fee, deducted from the creative's payout for each milestone. */
 const PLATFORM_FEE_RATE = 0.03;
 
 let stripeClient: Stripe | null = null;
@@ -40,7 +44,8 @@ function stripe(): Stripe {
 }
 
 const cents = (dollars: number) => Math.round(dollars * 100);
-const feeCents = (totalDollars: number) => Math.round(cents(totalDollars) * PLATFORM_FEE_RATE);
+/** The platform's cut of a milestone payout, in cents. */
+const payoutFeeCents = (amountCents: number) => Math.round(amountCents * PLATFORM_FEE_RATE);
 
 function requireAuth(req: CallableRequest<unknown>): string {
   if (!req.auth?.uid) throw new HttpsError('unauthenticated', 'Please sign in.');
@@ -158,7 +163,6 @@ export const createContractCheckout = onCall({ secrets: [STRIPE_SECRET_KEY] }, a
     throw new HttpsError('failed-precondition', 'The milestone total doesn’t match the contract. Please refresh.');
   }
   const amount = cents(totalDollars);
-  const fee = feeCents(totalDollars);
   const base = APP_URL.value();
 
   const session = await stripe().checkout.sessions.create({
@@ -177,21 +181,14 @@ export const createContractCheckout = onCall({ secrets: [STRIPE_SECRET_KEY] }, a
           unit_amount: amount,
           product_data: { name: `Contract: ${String(c.questTitle).slice(0, 200)}`, description: `With ${String(c.creativeName).slice(0, 100)}` }
         }
-      },
-      {
-        quantity: 1,
-        price_data: {
-          currency: 'usd',
-          unit_amount: fee,
-          product_data: { name: 'SideQuests platform fee (3%)' }
-        }
       }
     ],
     payment_intent_data: {
       transfer_group: contractId,
       metadata: { contractId, clientUid: uid, creativeUid: c.creativeUid }
     },
-    metadata: { contractId, amountCents: String(amount), feeCents: String(fee) },
+    // feeCents is 0: the gig provider pays only the contract total.
+    metadata: { contractId, amountCents: String(amount), feeCents: '0', feeModel: 'creative' },
     success_url: `${base}/?contract=${encodeURIComponent(contractId)}&checkout=success`,
     cancel_url: `${base}/?contract=${encodeURIComponent(contractId)}&checkout=cancelled`
   });
@@ -229,6 +226,8 @@ async function activateFromSession(session: Stripe.Checkout.Session) {
       chargeId: chargeId || null,
       fundedAmountCents: Number(session.metadata?.amountCents),
       feeAmountCents: Number(session.metadata?.feeCents),
+      // Who pays the 3%: 'creative' (deducted from payouts) or the older 'provider' model.
+      feeModel: Number(session.metadata?.feeCents) > 0 ? 'provider' : 'creative',
       releasedAmountCents: 0,
       fundedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -324,17 +323,20 @@ export const approveMilestone = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (
   if (alreadyReleased + amount > Number(c.fundedAmountCents || 0)) {
     throw new HttpsError('failed-precondition', 'This would release more than was paid in. Please contact support.');
   }
+  // The creative's payout is the milestone amount minus the platform fee.
+  const fee = c.feeModel === 'creative' ? payoutFeeCents(amount) : 0;
+  const payout = amount - fee;
 
   // Idempotent: retrying the same approval never pays twice.
   const transfer = await stripe().transfers.create(
     {
-      amount,
+      amount: payout,
       currency: 'usd',
       destination,
       transfer_group: contractId,
       ...(c.chargeId ? { source_transaction: c.chargeId } : {}),
       description: `${String(c.questTitle).slice(0, 100)}: ${String(m.title).slice(0, 100)}`,
-      metadata: { contractId, milestoneId }
+      metadata: { contractId, milestoneId, milestoneCents: String(amount), feeCents: String(fee) }
     },
     { idempotencyKey: `release_${contractId}_${milestoneId}` }
   );
@@ -347,16 +349,22 @@ export const approveMilestone = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (
       feedback,
       reviewedAt: new Date().toISOString(),
       transferId: transfer.id,
+      payoutCents: payout,
+      feeCents: fee,
       paidAt: new Date().toISOString()
     });
-    tx.update(cRef, { releasedAmountCents: FieldValue.increment(amount), updatedAt: new Date().toISOString() });
+    tx.update(cRef, {
+      releasedAmountCents: FieldValue.increment(amount),
+      platformFeesCents: FieldValue.increment(fee),
+      updatedAt: new Date().toISOString()
+    });
   });
 
   await postSystemMessage(
     contractId,
     uid,
     c.clientName,
-    `Approved “${m.title}” and released $${(amount / 100).toLocaleString('en-US')} to ${c.creativeName}.${feedback ? ` ${feedback}` : ''}`
+    `Approved “${m.title}” and released $${(payout / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} to ${c.creativeName}${fee ? ` ($${(amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} less the 3% SideQuests fee)` : ''}.${feedback ? ` ${feedback}` : ''}`
   );
   return { transferId: transfer.id };
 });

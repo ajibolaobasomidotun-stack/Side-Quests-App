@@ -144,7 +144,7 @@ export function LandingHero({ onFindGigs, onHire }: { onFindGigs: () => void; on
           </button>
         </div>
         <div className="mt-7 flex flex-wrap gap-x-6 gap-y-2 text-sm text-[#BDBDB6]">
-          {['Free to join', 'Creatives keep 100% of their rate', 'Payouts by Stripe'].map((t) => (
+          {['Free to join', 'No fees for gig providers', 'Payouts by Stripe'].map((t) => (
             <span key={t} className="flex items-center gap-2"><Check />{t}</span>
           ))}
         </div>
@@ -248,7 +248,7 @@ export function HowItWorks() {
   const go = (i: number, keepPlaying: boolean) => {
     start.current = Date.now();
     setElapsed(0);
-    setReleased(i === 3 && reduce ? 1500 : 0);
+    setReleased(i === 3 && reduce ? 1455 : 0);
     setStep(i);
     if (!keepPlaying) setPlaying(false);
   };
@@ -258,7 +258,7 @@ export function HowItWorks() {
       const e = Date.now() - start.current;
       if (auto && e > STEP_MS) { go((step + 1) % 4, true); return; }
       setElapsed(Math.min(1, e / STEP_MS));
-      if (step === 3) setReleased(Math.round(Math.min(1, e / 900) * 1500 * 100) / 100);
+      if (step === 3) setReleased(Math.round(Math.min(1, e / 900) * 1455 * 100) / 100);
     }, 50);
     return () => window.clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -346,8 +346,8 @@ export function HowItWorks() {
           {step === 1 && (
             <div className="flex items-center gap-4 p-4 rounded-2xl border border-brand-volt/30 bg-brand-volt/5">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#C3F400" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.4 8.5 8 9.5 4.6-1 8-4.5 8-9.5V6l-8-3Z" /><path d="m8.5 12 2.5 2.5 4.5-5" /></svg>
-              <div className="flex-1"><span className="block text-xs text-brand-text-muted">Held by Protected Payments</span><span className="font-mono text-2xl text-white">$3,090.00</span></div>
-              <span className="text-xs text-brand-text-muted text-right">Paid by bank<br />incl. 3% fee</span>
+              <div className="flex-1"><span className="block text-xs text-brand-text-muted">Held by Protected Payments</span><span className="font-mono text-2xl text-white">$3,000.00</span></div>
+              <span className="text-xs text-brand-text-muted text-right">Paid by bank<br />no fees on top</span>
             </div>
           )}
           {step === 2 && (
@@ -361,7 +361,7 @@ export function HowItWorks() {
           )}
           {step === 3 && (
             <div className="flex items-center justify-between p-4 rounded-2xl bg-brand-volt text-brand-bg">
-              <div><span className="block text-xs font-semibold opacity-70">Released to your bank</span><span className="font-mono text-2xl font-semibold">+{money(released)}</span></div>
+              <div><span className="block text-xs font-semibold opacity-70">Released to your bank, after the 3% fee</span><span className="font-mono text-2xl font-semibold">+{money(released)}</span></div>
               <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#0E0E0E" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></svg>
             </div>
           )}
@@ -456,8 +456,8 @@ export function PricingCalculator() {
     <section id="pricing-home" className="py-16 border-b border-white/5 grid lg:grid-cols-2 gap-10 items-center">
       <div>
         <Eyebrow>Simple pricing</Eyebrow>
-        <h3 className="font-display text-4xl md:text-5xl text-white font-semibold mt-3">Free to join. <span className="text-brand-volt italic">3%</span> when you hire.</h3>
-        <p className="mt-4 text-brand-text-muted max-w-md">The fee is paid by the gig provider, on top of the agreed amount. Creatives keep every cent of their rate.</p>
+        <h3 className="font-display text-4xl md:text-5xl text-white font-semibold mt-3">Free to join. <span className="text-brand-volt italic">3%</span> when you get paid.</h3>
+        <p className="mt-4 text-brand-text-muted max-w-md">Gig providers pay the agreed amount and nothing more. A flat 3% comes out of each payout, so creatives keep 97% of their rate.</p>
       </div>
       <div className="p-6 sm:p-8 rounded-3xl border border-white/10 bg-[#141414]">
         <label htmlFor="lp-budget" className="flex justify-between text-sm text-brand-text-muted">
@@ -467,13 +467,13 @@ export function PricingCalculator() {
         <div className="mt-6 grid grid-cols-2 gap-3">
           <div className="p-4 rounded-2xl bg-white/5">
             <span className="block text-xs text-brand-text-muted">Gig provider pays</span>
-            <span className="block font-mono text-xl sm:text-2xl text-white mt-1">{money(budget + fee)}</span>
-            <span className="block text-xs text-brand-text-muted mt-1">incl. {money(fee)} fee</span>
+            <span className="block font-mono text-xl sm:text-2xl text-white mt-1">{money(budget)}</span>
+            <span className="block text-xs text-brand-text-muted mt-1">no fees on top</span>
           </div>
           <div className="p-4 rounded-2xl bg-brand-volt/10 border border-brand-volt/30">
             <span className="block text-xs text-brand-text-muted">Creative receives</span>
-            <span className="block font-mono text-xl sm:text-2xl text-brand-volt mt-1">{money(budget)}</span>
-            <span className="block text-xs text-brand-text-muted mt-1">100% of the rate</span>
+            <span className="block font-mono text-xl sm:text-2xl text-brand-volt mt-1">{money(budget - fee)}</span>
+            <span className="block text-xs text-brand-text-muted mt-1">after the {money(fee)} fee</span>
           </div>
         </div>
       </div>

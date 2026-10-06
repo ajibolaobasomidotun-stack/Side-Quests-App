@@ -272,7 +272,10 @@ export async function reviewMilestone(contractId: string, milestoneId: string, a
 
 const functions = getFunctions(app, 'us-central1');
 export const PLATFORM_FEE_RATE = 0.03;
+/** The 3% fee, deducted from what the creative receives. */
 export const platformFee = (total: number) => Math.round(total * 100 * PLATFORM_FEE_RATE) / 100;
+/** What the creative takes home from an amount after the fee. */
+export const creativeTakeHome = (total: number) => Math.round(total * 100 - total * 100 * PLATFORM_FEE_RATE) / 100;
 
 async function callForUrl(name: string, data: Record<string, unknown> = {}): Promise<string> {
   const res = await httpsCallable<Record<string, unknown>, { url: string }>(functions, name)(data);

@@ -227,6 +227,9 @@ export interface Contract {
   fundedAmountCents?: number;
   feeAmountCents?: number;
   releasedAmountCents?: number;
+  /** 'creative': 3% deducted from payouts (current). 'provider': older contracts where the gig provider paid it. */
+  feeModel?: 'creative' | 'provider';
+  platformFeesCents?: number;
   /** Set by the server: when the contract was marked complete. */
   completedAt?: string;
   /** Set by the server: uids that have left a review for this contract. */
@@ -253,6 +256,9 @@ export interface Milestone {
   /** Set by the server when the milestone's money is released. */
   transferId?: string;
   paidAt?: string;
+  /** Set by the server: what the creative received and the fee kept. */
+  payoutCents?: number;
+  feeCents?: number;
   /** How many times the gig provider asked for changes. */
   revisionCount?: number;
 }

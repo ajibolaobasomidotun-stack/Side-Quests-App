@@ -14,6 +14,7 @@ import {
   reviewMilestone,
   MAX_UPLOAD_BYTES,
   platformFee,
+  creativeTakeHome,
   startContractCheckout,
   startPayoutOnboarding,
   approveMilestoneAndRelease,
@@ -372,6 +373,11 @@ const StatusBanner: React.FC<BannerProps> = (p) => {
       </>) : box(<>
         <p className="text-sm text-white font-semibold">Review and accept the terms</p>
         <p className="text-xs text-brand-text-muted mt-1">{otherName} proposed the milestones below, totalling {money(contract.totalAmount)}. Once you accept, they pay the full amount up front and it’s released to you as each milestone is approved.</p>
+        <div className="mt-3 text-xs bg-brand-bg/60 border border-white/10 rounded-lg p-3 space-y-1 max-w-xs">
+          <div className="flex justify-between"><span className="text-brand-text-muted">Contract total</span><span className="text-white font-mono">{money2(contract.totalAmount)}</span></div>
+          <div className="flex justify-between"><span className="text-brand-text-muted">SideQuests fee (3%)</span><span className="text-white font-mono">−{money2(platformFee(contract.totalAmount))}</span></div>
+          <div className="flex justify-between border-t border-white/10 pt-1"><span className="text-white font-semibold">You receive</span><span className="text-brand-volt font-mono font-bold">{money2(creativeTakeHome(contract.totalAmount))}</span></div>
+        </div>
         {!p.payoutsReady && (
           <p className="text-[11px] text-amber-200 mt-2">Before accepting, set up payouts with Stripe so you can be paid. It takes a few minutes and your bank details stay with Stripe.</p>
         )}
@@ -397,7 +403,6 @@ const StatusBanner: React.FC<BannerProps> = (p) => {
       </>, 'volt');
 
     case 'awaiting_payment': {
-      const fee = platformFee(contract.totalAmount);
       const processing = contract.paymentStatus === 'processing';
       const failed = contract.paymentStatus === 'failed';
       return isClient ? box(<>
@@ -409,15 +414,14 @@ const StatusBanner: React.FC<BannerProps> = (p) => {
             <p className="text-xs text-brand-text-muted mt-1">{otherName} accepted the terms. Your payment is held by SideQuests Protected Payments and released as you approve each milestone.</p>
             {failed && <p className="text-xs text-red-300 mt-2">Your last payment didn’t go through. Please try again.</p>}
             <div className="mt-3 text-xs bg-brand-bg/60 border border-white/10 rounded-lg p-3 space-y-1 max-w-xs">
-              <div className="flex justify-between"><span className="text-brand-text-muted">Contract total</span><span className="text-white font-mono">{money2(contract.totalAmount)}</span></div>
-              <div className="flex justify-between"><span className="text-brand-text-muted">Platform fee (3%)</span><span className="text-white font-mono">{money2(fee)}</span></div>
-              <div className="flex justify-between border-t border-white/10 pt-1"><span className="text-white font-semibold">You pay</span><span className="text-brand-volt font-mono font-bold">{money2(contract.totalAmount + fee)}</span></div>
+              <div className="flex justify-between"><span className="text-white font-semibold">You pay</span><span className="text-brand-volt font-mono font-bold">{money2(contract.totalAmount)}</span></div>
+              <div className="text-[11px] text-brand-text-muted">No fees for gig providers.</div>
             </div>
             <p className="text-[11px] text-brand-text-muted mt-2">Pay by bank account (recommended) or card on the next screen.</p>
           </>
         )}
         <div className="flex flex-wrap gap-2 mt-4">
-          {!processing && <button disabled={busy} onClick={p.onPay} className={btnPrimary}>Pay {money2(contract.totalAmount + fee)}</button>}
+          {!processing && <button disabled={busy} onClick={p.onPay} className={btnPrimary}>Pay {money2(contract.totalAmount)}</button>}
           {!processing && <button disabled={busy} onClick={p.onCancel} className={btnGhost}>Cancel contract</button>}
         </div>
       </>, 'volt') : box(<>
@@ -570,7 +574,14 @@ const MilestoneRow: React.FC<MilestoneRowProps> = ({ index, milestone: m, contra
             {m.transferId && <Chip label={`Paid out${m.paidAt ? ` ${new Date(m.paidAt).toLocaleDateString()}` : ''}`} cls="bg-brand-volt/15 text-brand-volt border-brand-volt/30" />}
           </div>
         </div>
-        <span className="font-mono text-sm text-brand-volt font-bold">{money(m.amount)}</span>
+        <span className="text-right">
+          <span className="block font-mono text-sm text-brand-volt font-bold">{money(m.amount)}</span>
+          {!isClient && contract.feeModel !== 'provider' && (
+            <span className="block text-[10px] text-brand-text-muted">
+              {m.payoutCents !== undefined ? `You got ${money2(m.payoutCents / 100)}` : `You get ${money2(creativeTakeHome(m.amount))}`}
+            </span>
+          )}
+        </span>
       </div>
 
       {m.submissionNote && (m.status === 'submitted' || m.status === 'approved' || m.status === 'changes_requested') && (
