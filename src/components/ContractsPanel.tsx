@@ -377,6 +377,7 @@ const StatusBanner: React.FC<BannerProps> = (p) => {
           <div className="flex justify-between"><span className="text-brand-text-muted">Contract total</span><span className="text-white font-mono">{money2(contract.totalAmount)}</span></div>
           <div className="flex justify-between"><span className="text-brand-text-muted">SideQuests fee (3%)</span><span className="text-white font-mono">−{money2(platformFee(contract.totalAmount))}</span></div>
           <div className="flex justify-between border-t border-white/10 pt-1"><span className="text-white font-semibold">You receive</span><span className="text-brand-volt font-mono font-bold">{money2(creativeTakeHome(contract.totalAmount))}</span></div>
+          <div className="text-[11px] text-brand-text-muted pt-1">Each milestone is paid in full. The fee comes off your final payout.</div>
         </div>
         {!p.payoutsReady && (
           <p className="text-[11px] text-amber-200 mt-2">Before accepting, set up payouts with Stripe so you can be paid. It takes a few minutes and your bank details stay with Stripe.</p>
@@ -444,6 +445,7 @@ const StatusBanner: React.FC<BannerProps> = (p) => {
         </p>
         <p className="text-[11px] text-brand-text-muted mt-2">
           The full amount is held by SideQuests Protected Payments.
+          {!isClient && (contract.feeModel === 'creative_total' || !contract.feeModel) && ` The 3% SideQuests fee (${money2(platformFee(contract.totalAmount))}) comes off your final payout.`}
         </p>
         {isClient && p.allApproved && (
           <div className="mt-4"><button disabled={busy} onClick={p.onComplete} className={btnPrimary}>Mark contract complete</button></div>
@@ -576,10 +578,11 @@ const MilestoneRow: React.FC<MilestoneRowProps> = ({ index, milestone: m, contra
         </div>
         <span className="text-right">
           <span className="block font-mono text-sm text-brand-volt font-bold">{money(m.amount)}</span>
-          {!isClient && contract.feeModel !== 'provider' && (
-            <span className="block text-[10px] text-brand-text-muted">
-              {m.payoutCents !== undefined ? `You got ${money2(m.payoutCents / 100)}` : `You get ${money2(creativeTakeHome(m.amount))}`}
-            </span>
+          {!isClient && m.payoutCents !== undefined && m.payoutCents !== Math.round(m.amount * 100) && (
+            <span className="block text-[10px] text-brand-text-muted">You got {money2(m.payoutCents / 100)}</span>
+          )}
+          {!isClient && m.payoutCents === undefined && contract.feeModel === 'creative' && (
+            <span className="block text-[10px] text-brand-text-muted">You get {money2(creativeTakeHome(m.amount))}</span>
           )}
         </span>
       </div>

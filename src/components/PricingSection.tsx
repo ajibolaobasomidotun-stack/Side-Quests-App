@@ -13,7 +13,7 @@ export const PricingSection: React.FC<{ onGetStarted: () => void }> = ({ onGetSt
   const steps = [
     ['Agree the milestones', 'The gig provider and creative agree what will be delivered, and what each milestone is worth.'],
     ['Pay up front', 'The gig provider pays the agreed amount, with no fees on top. The money is held by SideQuests Protected Payments.'],
-    ['Approve and release', 'As each milestone is approved, its payment, less the 3% fee, is released to the creative’s bank account.']
+    ['Approve and release', 'As each milestone is approved, its payment is released to the creative’s bank account. The 3% fee on the total comes off the final payout.']
   ];
 
   return (
@@ -31,7 +31,7 @@ export const PricingSection: React.FC<{ onGetStarted: () => void }> = ({ onGetSt
             <span className="text-xs text-brand-text-muted font-mono uppercase tracking-wider">of what the creative earns</span>
           </div>
           <p className="text-sm text-brand-text-muted leading-relaxed mb-6">
-            Gig providers pay the agreed amount and nothing more. The 3% fee comes out of each milestone payout, so creatives keep 97% of their rate.
+            Gig providers pay the agreed amount and nothing more. The 3% fee is worked out on the contract total and taken from the creative’s final payout, so creatives keep 97% of their rate.
           </p>
           <ul className="space-y-3 border-t border-white/5 pt-6">
             {[

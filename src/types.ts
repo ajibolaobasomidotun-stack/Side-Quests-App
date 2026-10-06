@@ -227,8 +227,8 @@ export interface Contract {
   fundedAmountCents?: number;
   feeAmountCents?: number;
   releasedAmountCents?: number;
-  /** 'creative': 3% deducted from payouts (current). 'provider': older contracts where the gig provider paid it. */
-  feeModel?: 'creative' | 'provider';
+  /** 'creative_total' (current): 3% of the total, deducted from the final payout. Older: 'creative' (3% per payout), 'provider' (paid on top). */
+  feeModel?: 'creative_total' | 'creative' | 'provider';
   platformFeesCents?: number;
   /** Set by the server: when the contract was marked complete. */
   completedAt?: string;
