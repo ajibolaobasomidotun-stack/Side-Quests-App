@@ -34,7 +34,7 @@ setGlobalOptions({ region: 'us-central1', maxInstances: 10 });
 
 const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
 const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
-const APP_URL = defineString('APP_URL', { default: 'https://sidequests-f6394.web.app' });
+const APP_URL = defineString('APP_URL', { default: 'https://sidequestss.web.app' });
 
 /** Platform fee, deducted from the creative's payout for each milestone. */
 const PLATFORM_FEE_RATE = 0.03;
