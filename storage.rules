@@ -13,6 +13,7 @@ service firebase.storage {
       allow read: if isParticipant();
 
       allow create: if isParticipant()
+        && request.auth.token.email_verified == true
         && request.auth.uid == uploaderUid
         && request.resource.size < 1024 * 1024 * 1024;
 
@@ -25,6 +26,7 @@ service firebase.storage {
       allow read: if true;
 
       allow create: if request.auth != null && request.auth.uid == userId
+        && request.auth.token.email_verified == true
         && fileName.matches('[A-Za-z0-9]+[.](jpg|mp4|mov|webm)')
         && (
           (request.resource.contentType == 'image/jpeg' && request.resource.size < 10 * 1024 * 1024)

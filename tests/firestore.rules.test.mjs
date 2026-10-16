@@ -14,10 +14,11 @@ async function t(name, fn) {
   catch (e) { fail++; console.log('  FAIL', name, '-', e.message.split('\n')[0]); }
 }
 
-const studio = env.authenticatedContext('studio1').firestore();
-const artist = env.authenticatedContext('artist1').firestore();
-const artist2 = env.authenticatedContext('artist2').firestore();
+const studio = env.authenticatedContext('studio1', { email_verified: true }).firestore();
+const artist = env.authenticatedContext('artist1', { email_verified: true }).firestore();
+const artist2 = env.authenticatedContext('artist2', { email_verified: true }).firestore();
 const anon = env.unauthenticatedContext().firestore();
+const unverified = env.authenticatedContext('unverified1', { email_verified: false }).firestore();
 
 const quest = {
   title: 'Mix a 5-track EP', description: 'Need a stereo mix for five neo-soul tracks, stems ready.',
@@ -180,6 +181,11 @@ await t('other creatives cannot read the invite', () => assertFails(getDoc(doc(a
 await t('creative cannot edit the invite note', () => assertFails(updateDoc(doc(artist2, 'invites/qi_artist2'), { note: 'changed' })));
 await t('creative declines the invite', () => assertSucceeds(updateDoc(doc(artist2, 'invites/qi_artist2'), { status: 'declined', respondedAt: 'z' })));
 await t('studio cannot withdraw an answered invite', () => assertFails(deleteDoc(doc(studio, 'invites/qi_artist2'))));
+
+// --- email verification
+await t('unverified account can create its profile', () => assertSucceeds(setDoc(doc(unverified, 'users/unverified1'), { accountType: 'provider', displayName: 'New Studio', ageConfirmed: true })));
+await t('unverified account cannot post a quest', () => assertFails(setDoc(doc(unverified, 'quests/qu1'), { ...quest, clientUid: 'unverified1' })));
+await t('unverified account cannot apply', () => assertFails(setDoc(doc(unverified, 'applications/qi_unverified1'), app({ questId: 'qi', applicantUid: 'unverified1' }))));
 
 // --- bookmarks
 await t('save a bookmark', () => assertSucceeds(setDoc(doc(artist, 'bookmarks/artist1_q1'), { userId: 'artist1', questId: 'q1', createdAt: 'x' })));

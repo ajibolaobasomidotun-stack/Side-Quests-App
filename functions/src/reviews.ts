@@ -63,6 +63,7 @@ async function postSystemMessage(contractId: string, senderUid: string, senderNa
 export const submitReview = onCall(async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'Please sign in.');
+  if (req.auth?.token.email_verified !== true) throw new HttpsError('permission-denied', 'Please verify your email address first.');
   const data = (req.data || {}) as Record<string, unknown>;
 
   const contractId = typeof data.contractId === 'string' && data.contractId.length <= 300 ? data.contractId : '';

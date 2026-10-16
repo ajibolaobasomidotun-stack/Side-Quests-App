@@ -51,6 +51,10 @@ const payoutFeeCents = (amountCents: number) => Math.round(amountCents * PLATFOR
 
 function requireAuth(req: CallableRequest<unknown>): string {
   if (!req.auth?.uid) throw new HttpsError('unauthenticated', 'Please sign in.');
+  // Email accounts must verify their address before any payment action.
+  if (req.auth.token.email_verified !== true) {
+    throw new HttpsError('permission-denied', 'Please verify your email address first. Check your inbox for the link.');
+  }
   return req.auth.uid;
 }
 

@@ -213,7 +213,11 @@ export const ProofEditor: React.FC<{
         onChange(next);
         setSelectedId(item.id);
       } catch (err) {
-        setError(err instanceof ProofError ? err.message : `Couldn’t upload ${file.name}. Please try again.`);
+        setError(
+          err instanceof ProofError ? err.message
+          : (err as { code?: string })?.code === 'storage/unauthorized' ? 'Verify your email address to upload your work (see the banner at the top of the page).'
+          : `Couldn’t upload ${file.name}. Please try again.`
+        );
       } finally {
         setUploading((u) => u.filter((x) => x.key !== key));
       }

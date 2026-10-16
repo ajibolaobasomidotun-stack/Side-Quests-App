@@ -5,6 +5,7 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut,
   createUserWithEmailAndPassword,
+  sendEmailVerification,
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   updateProfile,
@@ -66,7 +67,30 @@ export async function signUpWithEmail(name: string, email: string, password: str
   if (name.trim()) {
     await updateProfile(cred.user, { displayName: name.trim() });
   }
+  // Email accounts must verify before they can post, apply, invite, message or pay.
+  await sendVerificationEmail(cred.user).catch(() => undefined);
   return cred.user;
+}
+
+/** Sends (or re-sends) the "verify your email" link. Returns to the app afterwards. */
+export async function sendVerificationEmail(user: FirebaseUser | null = auth.currentUser): Promise<void> {
+  if (!user || user.emailVerified) return;
+  await sendEmailVerification(user, { url: `${window.location.origin}/?verified=1` });
+}
+
+/**
+ * Re-reads the user from Firebase after they click the link, and refreshes
+ * their sign-in token so the database rules see the verified status.
+ */
+export async function refreshEmailVerified(): Promise<boolean> {
+  const user = auth.currentUser;
+  if (!user) return false;
+  await user.reload();
+  if (auth.currentUser?.emailVerified) {
+    await auth.currentUser.getIdToken(true);
+    return true;
+  }
+  return false;
 }
 
 export async function signInWithEmail(email: string, password: string): Promise<FirebaseUser> {

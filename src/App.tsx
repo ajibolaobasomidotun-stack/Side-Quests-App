@@ -67,6 +67,8 @@ import { AuthModal } from './components/AuthModal';
 import { ApplyModal } from './components/ApplyModal';
 import { Dashboard } from './components/Dashboard';
 import { InviteModal } from './components/InviteModal';
+import { VerifyEmailBanner } from './components/VerifyEmailBanner';
+import { refreshEmailVerified } from './lib/firebase';
 import { subscribeSentInvites, subscribeReceivedInvites, declineInvite, withdrawInvite, markInviteApplied } from './lib/invites';
 import { Avatar } from './components/Avatar';
 import { ContractsPanel } from './components/ContractsPanel';
@@ -111,6 +113,8 @@ export default function App() {
   
   // Firebase Auth & Cloud Firestore state
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  // Email accounts must verify their address (Google accounts already are).
+  const [emailVerified, setEmailVerified] = useState(true);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   const [userBookmarks, setUserBookmarks] = useState<string[]>([]);
   const [serverStatus, setServerStatus] = useState<{ status: string } | null>(null);
@@ -167,6 +171,11 @@ export default function App() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+      setEmailVerified(!user || user.emailVerified);
+      // Coming back from the verification link: refresh so the new status takes effect.
+      if (user && !user.emailVerified && new URLSearchParams(window.location.search).has('verified')) {
+        refreshEmailVerified().then((ok) => ok && setEmailVerified(true)).catch(() => undefined);
+      }
       if (!user) {
         setHasProfile(false);
         setUserProfile(INITIAL_USER_PROFILE);
@@ -391,9 +400,18 @@ export default function App() {
     }
   };
 
+  /** Blocks an action until the email address is verified; returns true when it can go ahead. */
+  const requireVerified = (action: string) => {
+    if (emailVerified) return true;
+    showToast(`Verify your email to ${action}. Check your inbox for the link, or resend it from the banner at the top.`, 'info');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return false;
+  };
+
   const openPostQuest = () => {
     if (!currentUser) { openAuth('signup'); return; }
     if (!hasProfile) { handleStartCreateProfile('provider'); return; }
+    if (!requireVerified('post a quest')) return;
     if (userProfile.accountType !== 'provider') {
       showToast('Switch to a Gig Provider account (Profile tab) to post quests.', 'info');
       return;
@@ -422,6 +440,7 @@ export default function App() {
       handleStartCreateProfile('artist');
       return;
     }
+    if (!requireVerified('apply')) return;
     if (quest.clientUid === currentUser.uid) {
       showToast('This is your own quest.', 'info');
       return;
@@ -467,6 +486,7 @@ export default function App() {
       showToast('Could not find that quest. Please refresh and try again.', 'error');
       return;
     }
+    if (!requireVerified('hire')) return;
     try {
       const contractId = await hireAndCreateContract(app, quest, { ...userProfile, id: currentUser.uid });
       showToast(`You hired ${app.applicantName}! Agree the milestones to get started.`, 'success');
@@ -516,6 +536,7 @@ export default function App() {
       return;
     }
     if (!isProviderAccount) return;
+    if (!requireVerified('invite creatives')) return;
     setSelectedCreative(null);
     setInvitingCreative(creative);
   };
@@ -600,6 +621,9 @@ export default function App() {
       </AnimatePresence>
 
       <SiteHeader nav={chromeNav} account={chromeAccount} />
+      {currentUser && !emailVerified && currentUser.email && (
+        <VerifyEmailBanner email={currentUser.email} onVerified={() => setEmailVerified(true)} showToast={showToast} />
+      )}
 
       {/* MAIN CONTAINER */}
       <main className="flex-grow pt-16 pb-24 md:pb-12 max-w-7xl mx-auto w-full px-4 md:px-8">

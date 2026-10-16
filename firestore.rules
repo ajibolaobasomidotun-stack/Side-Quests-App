@@ -7,6 +7,12 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Email accounts must click the verification link before they can post,
+    // apply, invite, hire or message. (Google sign-ins are already verified.)
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
     function uid() {
       return request.auth.uid;
     }
@@ -85,7 +91,7 @@ service cloud.firestore {
     match /quests/{questId} {
       allow read: if true;
 
-      allow create: if isSignedIn() && isProvider()
+      allow create: if isVerified() && isProvider()
         && incoming().clientUid == uid()
         && incoming().status == 'open'
         && incoming().title is string && incoming().title.size() >= 3 && incoming().title.size() <= 140
@@ -109,7 +115,7 @@ service cloud.firestore {
       allow read: if isSignedIn()
         && (existing().applicantUid == uid() || existing().clientUid == uid());
 
-      allow create: if isSignedIn()
+      allow create: if isVerified()
         && incoming().applicantUid == uid()
         && applicationId == incoming().questId + '_' + uid()
         && incoming().status == 'pending'
@@ -144,7 +150,7 @@ service cloud.firestore {
       allow read: if isSignedIn()
         && (existing().clientUid == uid() || existing().creativeUid == uid());
 
-      allow create: if isSignedIn() && isProvider()
+      allow create: if isVerified() && isProvider()
         && incoming().clientUid == uid()
         && inviteId == incoming().questId + '_' + incoming().creativeUid
         && incoming().creativeUid != uid()
@@ -192,7 +198,7 @@ service cloud.firestore {
       allow read: if isSignedIn() && uid() in existing().participants;
 
       // Created by the gig provider in the same write that accepts the application.
-      allow create: if isSignedIn()
+      allow create: if isVerified()
         && incoming().clientUid == uid()
         && contractId == incoming().questId + '_' + incoming().creativeUid
         && incoming().participants == [uid(), incoming().creativeUid]
@@ -292,7 +298,7 @@ service cloud.firestore {
       match /messages/{messageId} {
         allow read: if isParticipantOf(contractId);
 
-        allow create: if isParticipantOf(contractId)
+        allow create: if isVerified() && isParticipantOf(contractId)
           && incoming().senderUid == uid()
           && incoming().type in ['text', 'file', 'system']
           && incoming().text is string && incoming().text.size() <= 4000
