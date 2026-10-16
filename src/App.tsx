@@ -301,6 +301,16 @@ export default function App() {
       : subscribeReceivedInvites(currentUser.uid, setInvites);
   }, [currentUser, hasProfile, isProviderAccount]);
   const pendingInviteCount = isProviderAccount ? 0 : invites.filter(i => i.status === 'pending').length;
+  // Gig providers: applications still waiting for a decision on quests that are open.
+  const pendingApplicantCount = !isProviderAccount ? 0 : receivedApplications.filter(a =>
+    a.status === 'pending' && quests.some(q => q.id === a.questId && q.status === 'open')
+  ).length;
+
+  // My work opens on Contracts; until someone has a contract, show their quests / applications instead.
+  useEffect(() => {
+    if (activeTab === 'tasks' && contracts.length === 0 && !selectedContractId) setConsoleTab('quests');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, contracts.length]);
 
   const appliedQuestIds = new Set(myApplications.map(a => a.questId));
   const openQuests: Quest[] = quests
@@ -600,6 +610,7 @@ export default function App() {
     onJoin: () => openAuth('signup'),
     onSignOut: handleGoogleSignOut,
     onPostQuest: openPostQuest,
+    workCount: pendingApplicantCount + pendingInviteCount,
   };
 
   return (
@@ -994,7 +1005,7 @@ export default function App() {
                   <div className="flex bg-brand-container border border-white/10 p-1 rounded-xl w-fit">
                     {([
                       ['contracts', `Contracts${contracts.length ? ` (${contracts.length})` : ''}`],
-                      ['quests', userProfile.accountType === 'provider' ? 'Quests & Applicants' : `My Applications${pendingInviteCount ? ` · ${pendingInviteCount} invite${pendingInviteCount === 1 ? '' : 's'}` : ''}`]
+                      ['quests', userProfile.accountType === 'provider' ? `Quests & Applicants${pendingApplicantCount ? ` · ${pendingApplicantCount} new` : ''}` : `My Applications${pendingInviteCount ? ` · ${pendingInviteCount} invite${pendingInviteCount === 1 ? '' : 's'}` : ''}`]
                     ] as const).map(([key, label]) => (
                       <button
                         key={key}

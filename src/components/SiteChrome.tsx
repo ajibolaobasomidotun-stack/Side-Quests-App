@@ -20,6 +20,8 @@ type Account = {
   onJoin: () => void;
   onSignOut: () => void;
   onPostQuest: () => void;
+  /** Things waiting in My work (new applicants or invitations). */
+  workCount?: number;
 };
 
 const Logo = ({ onClick }: { onClick: () => void }) => (
@@ -29,15 +31,15 @@ const Logo = ({ onClick }: { onClick: () => void }) => (
   </button>
 );
 
-function useLinks(nav: Nav, signedIn: boolean) {
-  const links: { label: string; onClick: () => void; active: boolean }[] = [
+function useLinks(nav: Nav, signedIn: boolean, workCount = 0) {
+  const links: { label: string; onClick: () => void; active: boolean; count?: number }[] = [
     { label: 'Find gigs', onClick: nav.findGigs, active: nav.activeTab === 'quests' },
     { label: 'Creatives', onClick: () => nav.go('creatives'), active: nav.activeTab === 'creatives' },
     { label: 'How it works', onClick: nav.howItWorks, active: false },
     { label: 'Pricing', onClick: () => nav.go('pricing'), active: nav.activeTab === 'pricing' },
     { label: 'Guides', onClick: () => nav.go('learn'), active: nav.activeTab === 'learn' },
   ];
-  if (signedIn) links.push({ label: 'My work', onClick: () => nav.go('tasks'), active: nav.activeTab === 'tasks' });
+  if (signedIn) links.push({ label: 'My work', onClick: () => nav.go('tasks'), active: nav.activeTab === 'tasks', count: workCount });
   return links;
 }
 
@@ -47,7 +49,7 @@ export function SiteHeader({ nav, account }: { nav: Nav; account: Account }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const links = useLinks(nav, account.signedIn);
+  const links = useLinks(nav, account.signedIn, account.workCount);
   const firstName = (account.name || '').split(' ')[0] || 'Account';
 
   // close menus on outside click / Escape
@@ -84,6 +86,11 @@ export function SiteHeader({ nav, account }: { nav: Nav; account: Account }) {
               className={`px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${l.active ? 'text-white bg-white/5' : 'text-[#BDBDB6] hover:text-white'}`}
             >
               {l.label}
+              {!!l.count && (
+                <span className="ml-1.5 inline-flex min-w-[18px] h-[18px] px-1 items-center justify-center rounded-full bg-brand-volt text-brand-bg text-[10px] font-bold align-middle" aria-label={`${l.count} waiting`}>
+                  {l.count}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -259,8 +266,13 @@ export function MobileTabBar({ nav, account }: { nav: Nav; account: Account }) {
       {items.map((i) => {
         const on = i.tab !== null && nav.activeTab === i.tab;
         return (
-          <button key={i.label} onClick={i.onClick} aria-current={on ? 'page' : undefined} className={`flex flex-col items-center gap-1 py-2.5 text-[11px] cursor-pointer ${on ? 'text-brand-volt' : 'text-[#9A9A96]'}`}>
+          <button key={i.label} onClick={i.onClick} aria-current={on ? 'page' : undefined} className={`relative flex flex-col items-center gap-1 py-2.5 text-[11px] cursor-pointer ${on ? 'text-brand-volt' : 'text-[#9A9A96]'}`}>
             <Icon d={i.d} />
+            {i.tab === 'tasks' && !!account.workCount && (
+              <span className="absolute top-1.5 left-1/2 ml-2 min-w-[16px] h-[16px] px-1 rounded-full bg-brand-volt text-brand-bg text-[9px] font-bold flex items-center justify-center" aria-label={`${account.workCount} waiting`}>
+                {account.workCount}
+              </span>
+            )}
             {i.label}
           </button>
         );
