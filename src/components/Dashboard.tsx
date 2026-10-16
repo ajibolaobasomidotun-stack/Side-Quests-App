@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Application, Quest, UserProfile } from '../types';
+import type { Application, Invite, Quest, UserProfile } from '../types';
 import { Plus, Work, CheckCircle, Close } from './Icons';
 import { Avatar } from './Avatar';
 
@@ -17,6 +17,10 @@ interface DashboardProps {
   onWithdraw: (app: Application) => Promise<void>;
   onSetQuestStatus: (quest: Quest, status: Quest['status']) => Promise<void>;
   onOpenContract: (contractId: string) => void;
+  /** Creatives: invites received. Gig providers: invites sent. */
+  invites: Invite[];
+  onDeclineInvite: (invite: Invite) => Promise<void>;
+  onWithdrawInvite: (invite: Invite) => Promise<void>;
 }
 
 const statusChip: Record<string, string> = {
@@ -25,11 +29,13 @@ const statusChip: Record<string, string> = {
   declined: 'bg-red-500/10 text-red-300 border-red-500/20',
   open: 'bg-brand-volt/15 text-brand-volt border-brand-volt/30',
   active: 'bg-sky-500/10 text-sky-300 border-sky-500/20',
-  completed: 'bg-white/5 text-brand-text-muted border-white/10'
+  completed: 'bg-white/5 text-brand-text-muted border-white/10',
+  invited: 'bg-brand-volt/15 text-brand-volt border-brand-volt/30',
+  applied: 'bg-sky-500/10 text-sky-300 border-sky-500/20'
 };
 
 const statusLabel: Record<string, string> = {
-  pending: 'Pending', accepted: 'Hired', declined: 'Declined',
+  pending: 'Pending', accepted: 'Hired', declined: 'Declined', invited: 'Invited', applied: 'Applied',
   open: 'Accepting applications', active: 'In progress', completed: 'Completed'
 };
 
@@ -99,6 +105,32 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                   </div>
                 </div>
 
+                {(() => {
+                  const sent = props.invites.filter((i) => i.questId === quest.id);
+                  if (!sent.length) return null;
+                  return (
+                    <div className="mb-4">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-brand-text-muted block mb-2">
+                        Invited ({sent.length})
+                      </span>
+                      <ul className="flex flex-wrap gap-2">
+                        {sent.map((i) => (
+                          <li key={i.id} className="flex items-center gap-2 bg-brand-bg/60 border border-white/5 rounded-lg pl-3 pr-2 py-1.5">
+                            <span className="text-xs text-white">{i.creativeName}</span>
+                            <Chip status={i.status === 'pending' ? 'invited' : i.status} />
+                            {i.status === 'pending' && quest.status === 'open' && (
+                              <button disabled={busyId === i.id} onClick={() => act(i.id, () => props.onWithdrawInvite(i))}
+                                className="text-[11px] text-brand-text-muted hover:text-red-300 underline">
+                                Withdraw
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })()}
+
                 <span className="font-mono text-[10px] uppercase tracking-widest text-brand-text-muted block mb-2">
                   Applicants ({apps.length})
                 </span>
@@ -112,7 +144,10 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                           <div className="flex items-center gap-3">
                             <Avatar src={a.applicantAvatar} name={a.applicantName} className="w-10 h-10 rounded-lg text-sm" />
                             <div>
-                              <p className="text-sm text-white font-semibold">{a.applicantName}</p>
+                              <p className="text-sm text-white font-semibold">
+                                {a.applicantName}
+                                {props.invites.some((i) => i.id === a.id) && <span className="ml-2 text-[10px] font-mono uppercase text-brand-volt">You invited them</span>}
+                              </p>
                               {a.applicantHeadline && <p className="text-[11px] text-brand-text-muted">{a.applicantHeadline}</p>}
                             </div>
                           </div>
@@ -148,8 +183,55 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
 
   // Creative view
   const apps = props.myApplications;
+  const pendingInvites = props.invites.filter((i) => i.status === 'pending');
   return (
     <section className="space-y-4">
+      {pendingInvites.length > 0 && (
+        <div className="space-y-3 mb-4">
+          <div>
+            <h4 className="font-display text-xl text-white font-semibold">Invitations ({pendingInvites.length})</h4>
+            <p className="text-xs text-brand-text-muted mt-1">Gig providers who’d like you to apply to their quest.</p>
+          </div>
+          <ul className="space-y-3">
+            {pendingInvites.map((i) => {
+              const quest = quests.find((q) => q.id === i.questId);
+              const open = quest?.status === 'open';
+              return (
+                <li key={i.id} className="bg-brand-volt/5 border border-brand-volt/25 rounded-2xl p-5">
+                  <div className="flex items-start gap-3">
+                    <Avatar src={i.clientAvatar} name={i.clientName} className="w-10 h-10 rounded-lg text-sm" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-brand-text-muted"><span className="text-white font-semibold">{i.clientName}</span> invited you to apply</p>
+                      <button disabled={!quest} onClick={() => quest && props.onViewQuest(quest)} className="font-display text-base text-white font-semibold text-left hover:text-brand-volt disabled:hover:text-white mt-0.5">
+                        {i.questTitle}
+                      </button>
+                      <p className="text-[11px] text-brand-text-muted font-mono mt-0.5">
+                        ${Number(i.questBudget).toLocaleString()}{i.questCategory ? ` · ${i.questCategory}` : ''} · {new Date(i.createdAt).toLocaleDateString()}
+                      </p>
+                      {i.note && <p className="text-sm text-white/90 mt-2 whitespace-pre-line">“{i.note}”</p>}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-4 justify-end">
+                    <button disabled={busyId === i.id} onClick={() => act(i.id, () => props.onDeclineInvite(i))}
+                      className="text-xs text-white border border-white/10 hover:bg-white/5 px-4 py-2 rounded-lg">
+                      Decline
+                    </button>
+                    {open ? (
+                      <button onClick={() => quest && props.onViewQuest(quest)}
+                        className="text-xs font-bold bg-brand-volt text-brand-bg px-4 py-2 rounded-lg">
+                        View quest & apply
+                      </button>
+                    ) : (
+                      <span className="text-xs text-brand-text-muted px-2 py-2">This quest is no longer open</span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h4 className="font-display text-xl text-white font-semibold">Your applications</h4>

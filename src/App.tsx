@@ -53,7 +53,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { profileSocialLinks } from './lib/social';
 import { visibleProof } from './lib/proof';
 import { SocialButtons, ProofGallery, TrackRecord } from './components/ProfileExtras';
-import { Creative, Quest, Article, UserProfile, AccountType, Application, Contract } from './types';
+import { Creative, Quest, Article, UserProfile, AccountType, Application, Contract, Invite } from './types';
 import { LEARN_ARTICLES } from './data';
 import { GIG_CATEGORIES, GIG_CATEGORY_KEYS } from './categories';
 import { INITIAL_USER_PROFILE, ARTIST_CATEGORIES, PROVIDER_CATEGORIES } from './profileData';
@@ -66,6 +66,8 @@ import { LandingHero, Disciplines, HowItWorks, BothSides, FoundingCreatives, Pri
 import { AuthModal } from './components/AuthModal';
 import { ApplyModal } from './components/ApplyModal';
 import { Dashboard } from './components/Dashboard';
+import { InviteModal } from './components/InviteModal';
+import { subscribeSentInvites, subscribeReceivedInvites, declineInvite, withdrawInvite, markInviteApplied } from './lib/invites';
 import { Avatar } from './components/Avatar';
 import { ContractsPanel } from './components/ContractsPanel';
 import { hireAndCreateContract, subscribeMyContracts, refreshPayoutStatus } from './lib/contracts';
@@ -120,6 +122,9 @@ export default function App() {
   
   // Active detail views
   const [selectedCreative, setSelectedCreative] = useState<Creative | null>(null);
+  // Invitations: sent (gig providers) or received (creatives)
+  const [invites, setInvites] = useState<Invite[]>([]);
+  const [invitingCreative, setInvitingCreative] = useState<Creative | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [selectedQuest, setSelectedQuest] = useState<Quest | null>(null);
   
@@ -260,6 +265,15 @@ export default function App() {
     const unsubReceived = subscribeReceivedApplications(currentUser.uid, setReceivedApplications);
     return () => { unsubContracts(); unsubMine(); unsubReceived(); };
   }, [currentUser]);
+
+  const isProviderAccount = userProfile.accountType === 'provider';
+  useEffect(() => {
+    if (!currentUser || !hasProfile) { setInvites([]); return; }
+    return isProviderAccount
+      ? subscribeSentInvites(currentUser.uid, setInvites)
+      : subscribeReceivedInvites(currentUser.uid, setInvites);
+  }, [currentUser, hasProfile, isProviderAccount]);
+  const pendingInviteCount = isProviderAccount ? 0 : invites.filter(i => i.status === 'pending').length;
 
   const appliedQuestIds = new Set(myApplications.map(a => a.questId));
   const openQuests: Quest[] = quests
@@ -436,6 +450,7 @@ export default function App() {
       proposalText,
       bidAmount
     });
+    await markInviteApplied(quest.id, currentUser.uid);
     showToast('Application sent! Track it in the OS Console.', 'success');
   };
 
@@ -487,9 +502,25 @@ export default function App() {
     }
   };
 
-  const handleDirectHire = (_creative: Creative) => {
-    showToast('Direct hiring arrives with Protected Payments. For now, post a quest and they can apply.', 'info');
+  /** Gig providers invite a creative to apply to one of their open quests. */
+  const handleInviteCreative = (creative: Creative) => {
+    if (!currentUser) {
+      showToast('Sign in as a gig provider to invite creatives.', 'info');
+      openAuth('signup');
+      return;
+    }
+    if (!hasProfile) {
+      showToast('Set up your gig provider profile first.', 'info');
+      setActiveTab('profile');
+      setIsEditingProfile(true);
+      return;
+    }
+    if (!isProviderAccount) return;
+    setSelectedCreative(null);
+    setInvitingCreative(creative);
   };
+  // Invites are for gig providers only (signed-out visitors see it and are asked to sign in).
+  const canInvite = (creative: Creative) => (!currentUser || isProviderAccount) && creative.id !== currentUser?.uid;
 
   // Keep /terms and /privacy as real, shareable URLs; everything else lives at /.
   useEffect(() => {
@@ -816,12 +847,14 @@ export default function App() {
                         >
                           View Profile
                         </button>
-                        <button 
-                          onClick={() => handleDirectHire(creative)}
-                          className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-4 py-2.5 rounded-lg hover:scale-[1.03] active:scale-95 transition-all"
-                        >
-                          Hire & Fund
-                        </button>
+                        {canInvite(creative) && (
+                          <button 
+                            onClick={() => handleInviteCreative(creative)}
+                            className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-4 py-2.5 rounded-lg hover:scale-[1.03] active:scale-95 transition-all"
+                          >
+                            Invite to apply
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -929,7 +962,7 @@ export default function App() {
                   <div className="flex bg-brand-container border border-white/10 p-1 rounded-xl w-fit">
                     {([
                       ['contracts', `Contracts${contracts.length ? ` (${contracts.length})` : ''}`],
-                      ['quests', userProfile.accountType === 'provider' ? 'Quests & Applicants' : 'My Applications']
+                      ['quests', userProfile.accountType === 'provider' ? 'Quests & Applicants' : `My Applications${pendingInviteCount ? ` · ${pendingInviteCount} invite${pendingInviteCount === 1 ? '' : 's'}` : ''}`]
                     ] as const).map(([key, label]) => (
                       <button
                         key={key}
@@ -980,6 +1013,15 @@ export default function App() {
                   onWithdraw={handleWithdrawApplication}
                   onSetQuestStatus={handleSetQuestStatus}
                   onOpenContract={openContract}
+                  invites={invites}
+                  onDeclineInvite={async (i) => {
+                    try { await declineInvite(i.id); showToast('Invite declined.', 'info'); }
+                    catch { showToast('Couldn’t decline that invite. Please try again.', 'error'); }
+                  }}
+                  onWithdrawInvite={async (i) => {
+                    try { await withdrawInvite(i.id); showToast('Invite withdrawn.', 'info'); }
+                    catch { showToast('Couldn’t withdraw that invite. Please try again.', 'error'); }
+                  }}
                 />
               )}
             </motion.div>
@@ -1142,14 +1184,14 @@ export default function App() {
                 >
                   Close
                 </button>
-                <button 
-                  onClick={() => {
-                    handleDirectHire(selectedCreative);
-                  }}
-                  className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-6 py-2.5 rounded-lg hover:scale-[1.02] active:scale-95 transition-all shadow-md shadow-brand-volt/10"
-                >
-                  Secure Direct Hire
-                </button>
+                {canInvite(selectedCreative) && (
+                  <button 
+                    onClick={() => handleInviteCreative(selectedCreative)}
+                    className="bg-brand-volt text-brand-bg font-sans font-bold text-xs px-6 py-2.5 rounded-lg hover:scale-[1.02] active:scale-95 transition-all shadow-md shadow-brand-volt/10"
+                  >
+                    Invite to apply
+                  </button>
+                )}
               </div>
 
             </motion.div>
@@ -1194,6 +1236,15 @@ export default function App() {
               </div>
 
               <div className="space-y-4 text-xs">
+                {(() => {
+                  const inv = !isProviderAccount && invites.find(i => i.questId === selectedQuest.id && i.status === 'pending');
+                  return inv ? (
+                    <div className="rounded-xl border border-brand-volt/30 bg-brand-volt/5 p-3">
+                      <p className="text-xs text-white"><span className="font-semibold">{inv.clientName}</span> invited you to apply.</p>
+                      {inv.note && <p className="text-xs text-white/80 mt-1">“{inv.note}”</p>}
+                    </div>
+                  ) : null;
+                })()}
                 <div>
                   <span className="font-mono text-[9px] text-brand-volt uppercase tracking-wider block mb-1">DISCIPLINE CATEGORY</span>
                   <span className="text-white uppercase font-bold">{selectedQuest.category}</span>
@@ -1318,6 +1369,19 @@ export default function App() {
         onClose={() => setApplyingQuest(null)}
         onSubmit={handleSubmitApplication}
       />
+
+      {currentUser && isProviderAccount && (
+        <InviteModal
+          creative={invitingCreative}
+          provider={{ ...userProfile, id: currentUser.uid }}
+          quests={quests}
+          sentInvites={invites}
+          receivedApplications={receivedApplications}
+          onClose={() => setInvitingCreative(null)}
+          onPostQuest={openPostQuest}
+          showToast={showToast}
+        />
+      )}
 
       {/* Post Quest Modal for Gig Providers */}
       <PostQuestModal

@@ -132,6 +132,47 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------
+    // Invites — id is "{questId}_{creativeUid}" (same as the application).
+    // A gig provider invites a creative to apply to one of their open quests.
+    // Visible only to the two of them.
+    // ---------------------------------------------------------------
+    function questDoc(questId) {
+      return get(/databases/$(database)/documents/quests/$(questId));
+    }
+
+    match /invites/{inviteId} {
+      allow read: if isSignedIn()
+        && (existing().clientUid == uid() || existing().creativeUid == uid());
+
+      allow create: if isSignedIn() && isProvider()
+        && incoming().clientUid == uid()
+        && inviteId == incoming().questId + '_' + incoming().creativeUid
+        && incoming().creativeUid != uid()
+        && incoming().status == 'pending'
+        && incoming().note is string && incoming().note.size() <= 500
+        && incoming().questTitle is string && incoming().questTitle.size() <= 140
+        && incoming().creativeName is string && incoming().creativeName.size() <= 80
+        && incoming().clientName is string && incoming().clientName.size() <= 80
+        && smallImageOrAbsent('clientAvatar')
+        // Only for the provider's own quest, while it's open
+        && questDoc(incoming().questId).data.clientUid == uid()
+        && questDoc(incoming().questId).data.status == 'open'
+        // Only to creative accounts that haven't already applied
+        && userDoc(incoming().creativeUid).data.accountType == 'artist'
+        && !exists(/databases/$(database)/documents/applications/$(inviteId));
+
+      // The creative declines, or marks it applied after applying.
+      allow update: if isSignedIn() && existing().creativeUid == uid()
+        && existing().status == 'pending'
+        && incoming().status in ['declined', 'applied']
+        && onlyChanges(['status', 'respondedAt']);
+
+      // The gig provider can withdraw an invite the creative hasn't acted on.
+      allow delete: if isSignedIn() && existing().clientUid == uid()
+        && existing().status == 'pending';
+    }
+
+    // ---------------------------------------------------------------
     // Contracts — id is "{questId}_{creativeUid}" (same as the application).
     // Only the gig provider (client) and the hired creative can see them.
     // ---------------------------------------------------------------

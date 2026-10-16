@@ -335,3 +335,27 @@ export interface PublicStats {
   asProvider?: RoleStats;
   updatedAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Invitations (a gig provider invites a creative to apply to one of their quests)
+// ---------------------------------------------------------------------------
+
+export type InviteStatus = 'pending' | 'applied' | 'declined';
+
+export interface Invite {
+  /** "{questId}_{creativeUid}" — the same id the application will have. */
+  id: string;
+  questId: string;
+  questTitle: string;
+  questBudget: number;
+  questCategory: string;
+  clientUid: string;
+  clientName: string;
+  clientAvatar?: string;
+  creativeUid: string;
+  creativeName: string;
+  note: string;
+  status: InviteStatus;
+  createdAt: string;
+  respondedAt?: string;
+}

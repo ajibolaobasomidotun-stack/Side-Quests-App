@@ -161,6 +161,26 @@ await t('cannot write reviews from the app', () => assertFails(setDoc(doc(studio
 await t('anyone reads track record', () => assertSucceeds(getDoc(doc(anon, 'publicStats/artist1'))));
 await t('cannot write track record', () => assertFails(setDoc(doc(artist, 'publicStats/artist1'), { updatedAt: 'y' })));
 
+// --- invites (gig provider invites a creative to apply)
+await env.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'quests/qi'), { ...quest, title: 'Invite quest', clientUid: 'studio1', status: 'open' });
+  await setDoc(doc(db, 'quests/qo'), { ...quest, title: 'Someone else', clientUid: 'other', status: 'open' });
+});
+const invite = (questId, creativeUid, over = {}) => ({
+  questId, questTitle: 'Invite quest', questBudget: 3000, questCategory: 'Studio Sessions',
+  clientUid: 'studio1', clientName: 'Studio One', creativeUid, creativeName: 'Artist Two',
+  note: 'Loved your mixes', status: 'pending', createdAt: 'x', ...over
+});
+await t('creative cannot send invites', () => assertFails(setDoc(doc(artist, 'invites/qi_artist2'), invite('qi', 'artist2', { clientUid: 'artist1' }))));
+await t('cannot invite to someone else’s quest', () => assertFails(setDoc(doc(studio, 'invites/qo_artist2'), invite('qo', 'artist2'))));
+await t('studio invites a creative to its open quest', () => assertSucceeds(setDoc(doc(studio, 'invites/qi_artist2'), invite('qi', 'artist2'))));
+await t('invited creative can read the invite', () => assertSucceeds(getDoc(doc(artist2, 'invites/qi_artist2'))));
+await t('other creatives cannot read the invite', () => assertFails(getDoc(doc(artist, 'invites/qi_artist2'))));
+await t('creative cannot edit the invite note', () => assertFails(updateDoc(doc(artist2, 'invites/qi_artist2'), { note: 'changed' })));
+await t('creative declines the invite', () => assertSucceeds(updateDoc(doc(artist2, 'invites/qi_artist2'), { status: 'declined', respondedAt: 'z' })));
+await t('studio cannot withdraw an answered invite', () => assertFails(deleteDoc(doc(studio, 'invites/qi_artist2'))));
+
 // --- bookmarks
 await t('save a bookmark', () => assertSucceeds(setDoc(doc(artist, 'bookmarks/artist1_q1'), { userId: 'artist1', questId: 'q1', createdAt: 'x' })));
 await t('cannot read others bookmarks', () => assertFails(getDoc(doc(artist2, 'bookmarks/artist1_q1'))));
