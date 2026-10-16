@@ -95,6 +95,15 @@ import {
 } from './lib/firebase';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 
+
+/** A profile is finished once it has a role, at least one category, a name and the 18+ confirmation. */
+function isProfileComplete(p: UserProfile): boolean {
+  return (p.accountType === 'artist' || p.accountType === 'provider')
+    && (p.selectedCategories?.length || 0) > 0
+    && !!p.displayName && p.displayName !== 'SideQuests Member'
+    && p.ageConfirmed === true;
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const path = typeof window !== 'undefined' ? window.location.pathname : '/';
@@ -107,7 +116,10 @@ export default function App() {
   const [consoleTab, setConsoleTab] = useState<'contracts' | 'quests'>('contracts');
   const [myApplications, setMyApplications] = useState<Application[]>([]);
   const [receivedApplications, setReceivedApplications] = useState<Application[]>([]);
+  // hasProfile = a finished profile (role, categories, 18+ confirmed). An account can
+  // have a profile document that isn't finished yet (e.g. older or abandoned sign-ups).
   const [hasProfile, setHasProfile] = useState<boolean>(false);
+  const [profileDocExists, setProfileDocExists] = useState<boolean>(false);
   const [authModal, setAuthModal] = useState<{ open: boolean; mode: 'signin' | 'signup' }>({ open: false, mode: 'signin' });
   const [applyingQuest, setApplyingQuest] = useState<Quest | null>(null);
   
@@ -178,31 +190,38 @@ export default function App() {
       }
       if (!user) {
         setHasProfile(false);
+        setProfileDocExists(false);
         setUserProfile(INITIAL_USER_PROFILE);
         setIsAuthLoading(false);
         return;
       }
       try {
         const remoteProfile = await fetchUserProfile(user.uid);
-        if (remoteProfile) {
+        setProfileDocExists(!!remoteProfile);
+        if (remoteProfile && isProfileComplete(remoteProfile)) {
           setUserProfile(remoteProfile);
           setHasProfile(true);
         } else {
-          // New account: send them through profile setup, where they choose Creative or Gig Provider.
+          // New (or unfinished) account — including first-time Google sign-ins:
+          // send them straight to profile setup to choose Creative or Gig Provider,
+          // pick their categories and confirm they're 18+.
           setHasProfile(false);
           setUserProfile(prev => ({
             ...INITIAL_USER_PROFILE,
+            ...(remoteProfile || {}),
             id: user.uid,
-            accountType: prev.accountType,
-            displayName: user.displayName || '',
-            avatarUrl: user.photoURL || '',
-            createdAt: new Date().toISOString()
+            accountType: remoteProfile?.accountType || prev.accountType,
+            displayName: (remoteProfile?.displayName && remoteProfile.displayName !== 'SideQuests Member' ? remoteProfile.displayName : '') || user.displayName || '',
+            avatarUrl: remoteProfile?.avatarUrl || user.photoURL || '',
+            createdAt: remoteProfile?.createdAt || new Date().toISOString()
           }));
           setIsEditingProfile(true);
           setActiveTab('profile');
+          window.scrollTo({ top: 0 });
         }
       } catch (e) {
         console.warn('Could not load profile:', e);
+        showToast('Couldn’t load your profile. Please refresh the page.', 'error');
       } finally {
         setIsAuthLoading(false);
       }
@@ -365,9 +384,10 @@ export default function App() {
     }
     const profileToSave: UserProfile = { ...savedProfile, id: currentUser.uid, verified: userProfile.verified };
     try {
-      await saveUserProfile(currentUser.uid, profileToSave, !hasProfile);
+      await saveUserProfile(currentUser.uid, profileToSave, !profileDocExists);
       setUserProfile(profileToSave);
       setHasProfile(true);
+      setProfileDocExists(true);
       setIsEditingProfile(false);
       showToast('Profile saved!', 'success');
       return true;
