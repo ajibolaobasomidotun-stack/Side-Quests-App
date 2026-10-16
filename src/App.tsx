@@ -80,7 +80,6 @@ import {
   signOutUser,
   fetchUserProfile,
   saveUserProfile,
-  updateAccountType,
   subscribeArtists,
   createQuest,
   subscribeQuests,
@@ -409,17 +408,6 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSwitchProfileType = async (newType: AccountType) => {
-    if (!currentUser || !hasProfile) return;
-    try {
-      await updateAccountType(currentUser.uid, newType);
-      setUserProfile(prev => ({ ...prev, accountType: newType }));
-      showToast(`Switched to ${newType === 'artist' ? 'Creative' : 'Gig Provider'} account.`, 'info');
-    } catch (err) {
-      showToast('Could not switch account type.', 'error');
-    }
-  };
-
   /** Blocks an action until the email address is verified; returns true when it can go ahead. */
   const requireVerified = (action: string) => {
     if (emailVerified) return true;
@@ -433,7 +421,7 @@ export default function App() {
     if (!hasProfile) { handleStartCreateProfile('provider'); return; }
     if (!requireVerified('post a quest')) return;
     if (userProfile.accountType !== 'provider') {
-      showToast('Switch to a Gig Provider account (Profile tab) to post quests.', 'info');
+      showToast('Only Gig Provider accounts can post quests. Your account is set up as a Creative.', 'info');
       return;
     }
     setIsPostQuestModalOpen(true);
@@ -466,7 +454,7 @@ export default function App() {
       return;
     }
     if (userProfile.accountType !== 'artist') {
-      showToast('Switch to a Creative account (Profile tab) to apply to quests.', 'info');
+      showToast('Only Creative accounts can apply to quests. Your account is set up as a Gig Provider.', 'info');
       return;
     }
     if (appliedQuestIds.has(quest.id)) {
@@ -1104,7 +1092,6 @@ export default function App() {
                 <ProfileView
                   profile={userProfile}
                   onEditProfile={() => setIsEditingProfile(true)}
-                  onSwitchAccountType={handleSwitchProfileType}
                   quests={quests}
                   creatives={creatives}
                   onSelectCreative={(c) => setSelectedCreative(c)}

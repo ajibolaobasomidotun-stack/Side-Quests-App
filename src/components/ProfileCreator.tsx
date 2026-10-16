@@ -129,9 +129,17 @@ export const ProfileCreator: React.FC<ProfileCreatorProps> = ({
   );
   const [newGoalInput, setNewGoalInput] = useState('');
 
-  // Handle switching account type
+  // Choosing the role. Creatives and gig providers have different category lists,
+  // so changing the role on a finished profile clears the categories after a warning.
   const handleTypeChange = (type: AccountType) => {
+    if (type === accountType) return;
+    const hadRole = (currentProfile.selectedCategories?.length || 0) > 0;
+    if (hadRole && !window.confirm(
+      `Change your role to ${type === 'artist' ? 'Creative' : 'Gig Provider'}? ` +
+      'Your current categories will be cleared and you\'ll need to choose new ones before saving.'
+    )) return;
     setAccountType(type);
+    setSelectedCategories([]);
   };
 
   // Toggle category selection

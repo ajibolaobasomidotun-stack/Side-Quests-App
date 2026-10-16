@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Avatar } from './Avatar';
-import { UserProfile, Quest, Creative, AccountType } from '../types';
+import { UserProfile, Quest, Creative } from '../types';
 import { ARTIST_CATEGORIES, PROVIDER_CATEGORIES } from '../profileData';
 import { profileSocialLinks } from '../lib/social';
 import { visibleProof } from '../lib/proof';
@@ -17,8 +17,6 @@ import {
   Edit3, 
   LocationOn, 
   Payments, 
-  Palette, 
-  Building2, 
   Sparkles, 
   ArrowForward, 
   CheckCircle,
@@ -32,7 +30,6 @@ import {
 interface ProfileViewProps {
   profile: UserProfile;
   onEditProfile: () => void;
-  onSwitchAccountType: (type: AccountType) => void;
   quests: Quest[];
   creatives: Creative[];
   onSelectQuest: (quest: Quest) => void;
@@ -47,7 +44,6 @@ interface ProfileViewProps {
 export const ProfileView: React.FC<ProfileViewProps> = ({
   profile,
   onEditProfile,
-  onSwitchAccountType,
   quests,
   creatives,
   onSelectQuest,
@@ -146,23 +142,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               Edit Profile & Categories
             </button>
             
-            <button
-              onClick={() => onSwitchAccountType(profile.accountType === 'artist' ? 'provider' : 'artist')}
-              className="bg-white/5 hover:bg-white/10 border border-white/10 text-white font-sans font-medium text-xs px-4 py-2 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {profile.accountType === 'artist' ? (
-                <>
-                  <Building2 className="w-3.5 h-3.5 text-brand-volt" />
-                  Switch to Gig Provider
-                </>
-              ) : (
-                <>
-                  <Palette className="w-3.5 h-3.5 text-brand-volt" />
-                  Switch to Creative
-                </>
-              )}
-            </button>
-
             {currentUser ? (
               <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-brand-volt/10 border border-brand-volt/30 text-brand-volt text-[11px] font-mono">
                 <span className="flex items-center gap-1.5">
